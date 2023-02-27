@@ -1,10 +1,10 @@
 import os
+from ompr.runner import OMPRunner, RunningWorker
 from pypaq.lipytools.printout import stamp
 from pypaq.lipytools.files import prep_folder
 from pypaq.lipytools.stats import msmx
 from pypaq.lipytools.pylogger import get_pylogger, get_child
 from pypaq.mpython.devices import DevicesPypaq, get_devices
-from pypaq.mpython.ompr import OMPRunner, RunningWorker
 from pypaq.pms.config_manager import ConfigManager
 from pypaq.pms.paspa import PaSpa
 from pypaq.pms.base import PSDD, POINT, point_str, get_params
