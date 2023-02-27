@@ -38,7 +38,7 @@ def hpmser(
         func: Callable,                                 # function which parameters need to be optimized
         func_psdd: PSDD,                                # func PSDD, from here points {param: arg} will be sampled
         func_const: Optional[POINT]=    None,           # func constant kwargs, will be updated with sample (point) taken from PaSpa
-        devices: DevicesPypaq=          None,           # devices to use for search
+        devices: DevicesPypaq=          None,           # devices to use for search, check pypaq.mpython.devices
         name: Optional[str]=            None,           # hpmser run name, for None stamp will be used
         add_stamp=                      True,           # adds short stamp to name, when name given
         use_GX=                         True,           # uses genetic xrossing while sampling top points
@@ -50,7 +50,7 @@ def hpmser(
         do_TB=                          True,           # plots with TB
         pref_axes: Optional[List[str]]= None,           # preferred axes for plot, put here a list of up to 3 params names ['param1',..]
         top_show_freq=                  20,             # how often top results summary will be printed
-        raise_exceptions=               True,           # forces subprocesses to raise + print exceptions, independent from verbosity (raising subprocess exception does not break hpmser process)
+        raise_exceptions=               True,           # forces subprocesses to raise + print exceptions (raising subprocess exception does not break hpmser process)
         logger=                         None,
         loglevel=                       20
 ) -> SRL:

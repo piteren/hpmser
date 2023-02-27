@@ -48,7 +48,7 @@ class TestSearchFunction(unittest.TestCase):
             'a':    [-5,    5],
             'b':    [-5.0,  5.0],
             'c':    [-2.0,  2],
-            'd':    [0.0,   5]}
+            'd':    (0.0, 1.5, 5)}
 
         hpmser(
             func=               some_func,

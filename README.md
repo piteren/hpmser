@@ -1,29 +1,34 @@
-## hpmser - Hyper Parameters Searching Function
+## hpmser - Hyper Parameters Search
 
-    searches hyper parameters space to MAXIMIZE the SCORE of given func
+------------
 
-        MAXIMIZE the SCORE == find points cluster with:
-         - high num of points in a small distance (dst)
-         - high max smooth_score
-         - high lowest score
+Assuming that there is a function:
 
-         policy of sampling the space is crucial (determines the speed, top result and convergence)
-         - fully random sampling is slow, wastes a lot of time and computing power
-         - too aggressive sampling may undersample the space and miss the real MAX
+`    def some_function(a,b,c,d) -> float`
 
-    to setup search:
-    1. having some func (callable):
-        - some parameters need to be optimized
-        - some parameters may be fixed / constant
-        - if function accepts 'device' or 'devices' it should be type of DevicesPypaq (check pypaq.mpython.devices),
-          it will be used by hpmser to put proper device for each function call
-        - returns a dict with 'score' or just a value (score)
-        There are two parameters of FUNCTION that may be used by hpmser:
-            - 'device' (type of DevicesPypaq - check pypaq.mpython.devices) -> hpmser will send device to func
-            - 'hpmser_mode' -> will be set to True by hpmser
-    2. define PSDD - dictionary with parameters to be optimized and the space to search in (check pypaq.pms.paspa.PaSpa)
-    3. import hpmser function into your script, and run it with:
-        - func
-        - func_psdd << PSDD
-        - func_const << dictionary of parameters that have to be given but should be fixed / constant durring optimization
-        - .. other params configure hpmser algorithm itself
+**hpmser()** will search for values of **a,b,c,d** that MAXIMIZE return value of given function.
+
+To start the search process you will need to:
+- give a **func** (type)
+- pass to **func_psdd** parameters space definition (with PSDD - check `pypaq.pms.base.py` for details)
+- if some parameters are *known constants*, you may pass their values to **func_const**
+- configure **devices** used and optionally advanced hpmser parameters
+
+You can check `/tests` for run example. There is also a project: https://github.com/piteren/hpmser_rastrigin
+that uses **hpmser**.
+
+------------
+
+**hpmser** implements mix of:
+- optimal space sampling based on current space knowledge (currently obtained results interpolation), with
+- random search
+
+**hpmser** supports:
+- multiprocessing (runs with subprocesses) with CPU & GPU devices with **devices** param - check `pypaq.mpython.devices` for details
+- exceptions handling, keyboard interruption without a crash
+- live process configuration and fine-tuning
+- process saving & resuming
+- 3D visualisation of parameters and function values
+- TensorBoard logging
+
+If you need any support, please contact me:  me@piotniewinski.com
