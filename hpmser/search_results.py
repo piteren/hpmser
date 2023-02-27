@@ -6,7 +6,7 @@ import random
 from typing import Sized, List, Tuple, Optional, Iterable
 import warnings
 
-from helpers import str_floatL
+from hpmser.helpers import str_floatL
 
 
 # Search Results List [SeRes] with some methods

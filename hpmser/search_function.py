@@ -13,8 +13,8 @@ import sys, select
 import time
 from typing import Callable, Optional, List, Any
 
-from helpers import str_floatL
-from search_results import SRL
+from hpmser.helpers import str_floatL
+from hpmser.search_results import SRL
 
 
 NP_SMOOTH = [3,5,9] # numbers of points for smoothing
