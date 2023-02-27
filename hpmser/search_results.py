@@ -1,5 +1,6 @@
 from pypaq.lipytools.files import r_pickle, w_pickle
 from pypaq.lipytools.plots import three_dim
+from pypaq.lipytools.pylogger import get_pylogger
 from pypaq.pms.paspa import PaSpa
 from pypaq.pms.base import POINT, point_str
 import random
@@ -28,13 +29,18 @@ class SRL(Sized):
 
     def __init__(
             self,
-            logger,
             paspa: Optional[PaSpa]=     None,   # parameters space of this SRL
             name: str=                  'SRL',
             np_smooth: int=             3,      # (NPS) Number of Points taken into account while calculating smooth score - default / starting value
-            plot_axes: list=            None):  # list with axes names (max 3), eg: ['drop_a','drop_b','loss']
+            plot_axes: list=            None,   # list with axes names (max 3), eg: ['drop_a','drop_b','loss']
+            logger=                     None,
+            loglevel=                   30,
+    ):
 
         self.name = name
+
+        if not logger:
+            logger = get_pylogger(level=loglevel)
         self.logger = logger
         self.logger.info(f'*** SRL : {self.name} *** initializing..')
 
