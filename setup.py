@@ -13,7 +13,7 @@ setup(
     url=                'https://github.com/piteren/hpmser.git',
     author=             'Piotr Niewinski',
     author_email=       'pioniewinski@gmail.com',
-    description=        'Hyper Parameters Searching Function',
+    description=        'Hyper Parameters Search',
     packages=           find_packages(),
     install_requires=   get_requirements(),
     license=            'MIT')

@@ -5,7 +5,6 @@ from pypaq.pms.paspa import PaSpa
 from pypaq.pms.base import POINT, point_str
 import random
 from typing import Sized, List, Tuple, Optional, Iterable
-import warnings
 
 from hpmser.helpers import str_floatL
 
@@ -103,7 +102,7 @@ class SRL(Sized):
     def get_top_SR(self) -> SeRes or None:
         if self.__srL:
             if not self.__smoothed_and_sorted:
-                warnings.warn('SRL asked to return top SR while SRL is not smoothed_and_sorted - have to sort!')
+                self.logger.warning('SRL asked to return top SR while SRL is not smoothed_and_sorted - have to sort!')
                 self.smooth_and_sort()
             return self.__srL[0]
         return None
