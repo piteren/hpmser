@@ -8,9 +8,9 @@ from pypaq.mpython.devices import DevicesPypaq, get_devices
 from pypaq.pms.config_manager import ConfigManager
 from pypaq.pms.paspa import PaSpa
 from pypaq.pms.base import PSDD, POINT, point_str, get_params
-from pypaq.torchness.tbwr import TBwr
 import sys, select
 import time
+from torchness.tbwr import TBwr
 from typing import Callable, Optional, List, Any
 
 from hpmser.helpers import str_floatL
