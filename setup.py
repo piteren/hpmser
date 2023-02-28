@@ -9,11 +9,11 @@ def get_requirements():
 
 setup(
     name=               'hpmser',
-    version=            'v0.2.3',
+    version=            'v1.0.0',
     url=                'https://github.com/piteren/hpmser.git',
     author=             'Piotr Niewinski',
     author_email=       'pioniewinski@gmail.com',
-    description=        'Hyper Parameters Search',
+    description=        'Hyper Parameters Search tool',
     packages=           find_packages(),
     install_requires=   get_requirements(),
     license=            'MIT')

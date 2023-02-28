@@ -1,8 +1,10 @@
-## hpmser - Hyper Parameters Search
+![](hpmser.png)
+
+## hpmser - Hyper Parameters Search tool
 
 ------------
 
-Assuming that there is a function:
+**hpmser** is a tool for searching optimal hyper-parameters of any function. Assuming there is a function:
 
 `    def some_function(a,b,c,d) -> float`
 

@@ -17,11 +17,12 @@ class TestSearchFunction(unittest.TestCase):
     def setUp(self) -> None:
         prep_folder(HPMSER_FD, flush_non_empty=True)
 
+
     def test_simple_run(self):
 
-        n_proc =            30#3
-        av_time =           1#3  # avg num of seconds for calculation
-        exception_prob =    0.01#0.3
+        n_proc =            30
+        av_time =           0.1  # avg num of seconds for calculation
+        exception_prob =    0.01
         verb =              1
 
         def some_func(
@@ -50,7 +51,7 @@ class TestSearchFunction(unittest.TestCase):
             'c':    [-2.0,  2],
             'd':    (0.0, 1.5, 5)}
 
-        hpmser(
+        srl = hpmser(
             func=               some_func,
             func_psdd=          psdd,
             func_const=         func_const,
@@ -58,3 +59,6 @@ class TestSearchFunction(unittest.TestCase):
             n_loops=            500,
             hpmser_FD=          HPMSER_FD,
             raise_exceptions=   False)
+
+        print(len(srl))
+        self.assertTrue(len(srl)==500)
