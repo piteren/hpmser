@@ -1,5 +1,5 @@
 import os
-from ompr.runner import OMPRunner, RunningWorker
+from ompr.runner import OMPRunner
 from pypaq.lipytools.printout import stamp
 from pypaq.lipytools.files import prep_folder
 from pypaq.lipytools.stats import msmx
@@ -7,13 +7,13 @@ from pypaq.lipytools.pylogger import get_pylogger, get_child
 from pypaq.mpython.devices import DevicesPypaq, get_devices
 from pypaq.pms.config_manager import ConfigManager
 from pypaq.pms.paspa import PaSpa
-from pypaq.pms.base import PSDD, POINT, point_str, get_params
+from pypaq.pms.base import PSDD, POINT, point_str
 import sys, select
 import time
 from torchness.tbwr import TBwr
-from typing import Callable, Optional, List, Any
+from typing import Callable, Optional, List, Union
 
-from hpmser.helpers import str_floatL
+from hpmser.helpers import str_floatL, HRW
 from hpmser.search_results import SRL
 
 
@@ -35,70 +35,29 @@ SAMPLING_CONFIG_UPD = {
 
 # Hyper Parameters Searching Function (based on OMPR engine)
 def hpmser(
-        func: Callable,                                 # function which parameters need to be optimized
-        func_psdd: PSDD,                                # func PSDD, from here points {param: arg} will be sampled
-        func_const: Optional[POINT]=    None,           # func constant kwargs, will be updated with sample (point) taken from PaSpa
-        devices: DevicesPypaq=          None,           # devices to use for search, check pypaq.mpython.devices
-        name: Optional[str]=            None,           # hpmser run name, for None stamp will be used
-        add_stamp=                      True,           # adds short stamp to name, when name given
-        use_GX=                         True,           # uses genetic xrossing while sampling top points
-        distance_L2=                    True,           # use L2(True) or L1(False) for distance calculation
-        stochastic_est: Optional[int]=  3,              # number of samples used for stochastic estimation, for 0 or None does not estimate
-        config_upd: Optional[int]=      1000,           # update config after n loops
-        n_loops: Optional[int]=         None,           # limit for number of search loops
-        hpmser_FD: str=                 '_hpmser_runs', # save folder
-        do_TB=                          True,           # plots with TB
-        pref_axes: Optional[List[str]]= None,           # preferred axes for plot, put here a list of up to 3 params names ['param1',..]
-        top_show_freq=                  20,             # how often top results summary will be printed
-        raise_exceptions=               True,           # forces subprocesses to raise + print exceptions (raising subprocess exception does not break hpmser process)
-        logger=                         None,
-        loglevel=                       20
+        func: Callable,                                         # function which parameters need to be optimized
+        func_psdd: PSDD,                                        # function parameters space definition dict (PSDD), from here points {param: arg} will be sampled
+        func_const: Optional[POINT]=                None,       # func constant kwargs, will be updated with sample (point) taken from PaSpa
+        devices: DevicesPypaq=                      None,       # devices to use for search, check pypaq.mpython.devices
+        n_loops: Optional[int]=                     2000,       # limit for number of search loops
+        update_config: Optional[Union[int,str]]=    'auto',     # update config after n loops
+        name: str=                                  'hpmser',   # hpmser run name
+        add_stamp=                                  True,       # adds short stamp to name, when name given
+        use_GX=                                     True,       # uses genetic xrossing while sampling top points
+        distance_L2=                                True,       # use L2(True) or L1(False) for distance calculation
+        stochastic_est: Optional[int]=              3,          # number of samples used for stochastic estimation, for 0 or None does not estimate
+        plot_axes: Optional[List[str]]=             None,       # preferred axes for plot, put here a list of up to 3 params names ['param1',..]
+        top_show_freq=                              20,         # how often top results summary will be printed
+        raise_exceptions=                           True,       # forces subprocesses to raise + print exceptions (raising subprocess exception does not break hpmser process)
+        hpmser_FD: str=                             '_hpmser',  # save folder
+        do_TB=                                      True,       # plots with TB
+        logger=                                     None,
+        loglevel=                                   20
 ) -> SRL:
 
-    # hpmser RunningWorker (process run by OMP in hpmser)
-    class HRW(RunningWorker):
+    if add_stamp: name = f'{name}_{stamp(letters=0)}'
 
-        def __init__(
-                self,
-                func: Callable,
-                func_const: Optional[POINT],
-                device: DevicesPypaq= None):
-
-            self.func = func
-            self.func_const = func_const if func_const else {}
-            self.device = device
-
-            # manage 'device'/'devices' & 'hpmser_mode' param in func >> set it in func if needed
-            func_args = get_params(self.func)
-            func_args = list(func_args['with_defaults'].keys()) + func_args['without_defaults']
-            for k in ['device','devices']:
-                if k in func_args:
-                    self.func_const[k] = self.device
-            if 'hpmser_mode' in func_args: self.func_const['hpmser_mode'] = True
-
-        # processes given spoint, passes **kwargs
-        def process(
-                self,
-                spoint: POINT,
-                **kwargs) -> Any:
-
-            spoint_with_defaults = {}
-            spoint_with_defaults.update(self.func_const)
-            spoint_with_defaults.update(spoint)
-
-            res = self.func(**spoint_with_defaults)
-            if type(res) is dict: score = res['score']
-            else:                 score = res
-
-            msg = {'spoint':spoint, 'score':score}
-            msg.update(kwargs)
-            return msg
-
-    # some defaults
-    if not name: name = stamp()
-    elif add_stamp: name = f'{stamp(letters=0)}_{name}'
-
-    prep_folder(hpmser_FD)  # create folder if needed
+    prep_folder(hpmser_FD) # create folder if needed
 
     # check for continuation
     srl = None
@@ -117,7 +76,8 @@ def hpmser(
         logger = get_pylogger(
             name=       name,
             folder=     f'{hpmser_FD}/{name}',
-            level=      loglevel)
+            level=      loglevel,
+            format=     '%(asctime)s : %(message)s')
 
     prep_folder(f'{hpmser_FD}/{name}') # needs to be created for ConfigManager
     config_manager = ConfigManager(
@@ -129,7 +89,7 @@ def hpmser(
     tbwr = TBwr(logdir=f'{hpmser_FD}/{name}') if do_TB else None
 
     logger.info(f'*** hpmser : {name} *** started for: {func.__name__}, sampling config: {sampling_config}')
-    if srl: logger.info(f'> search will continue with {len(srl)} results...')
+    if srl: logger.info(f'> search will continue with {len(srl)} results..')
 
     if not srl: srl = SRL(
         paspa=  PaSpa(
@@ -138,7 +98,7 @@ def hpmser(
             logger=         get_child(logger=logger, name='paspa', change_level=10)),
         name=   name,
         logger= logger)
-    srl.plot_axes = pref_axes
+    srl.plot_axes = plot_axes
 
     logger.info(f'\n{srl.paspa}')
 
@@ -158,8 +118,8 @@ def hpmser(
     scores_all = []
 
     devices = get_devices(devices=devices, torch_namespace=False) # manage devices
-
     num_free_rw = len(devices)
+    logger.info(f'> hpmser resolved given devices to: {devices}')
 
     omp = OMPRunner(
         rw_class=               HRW,
@@ -172,6 +132,9 @@ def hpmser(
         raise_RWW_exception=    logger.level < 11 or raise_exceptions,
         logger=                 get_child(logger=logger, name='omp', change_level=10)
     )
+
+    if update_config == 'auto':
+        update_config = n_loops // 2 if type(n_loops) is int else 1000
 
     top_time = time.time()
     top_speed_save = []
@@ -188,7 +151,7 @@ def hpmser(
             while num_free_rw:
                 logger.debug(f' >> got {num_free_rw} free RW at {sample_num} sample_num start')
 
-                if config_upd == sample_num:
+                if sample_num == update_config:
                     logger.info(f' > updating sampling config..')
                     new_sampling_config = config_manager.update(**SAMPLING_CONFIG_UPD)
                     sampling_config.update(new_sampling_config)
@@ -240,9 +203,10 @@ def hpmser(
                 if msg_sample_num in stochastic_points:
                     stochastic_results.append(msg_score)
                     if len(stochastic_results) == stochastic_est and logger.level < 21:
-                        logger.info(f' *** stochastic estimation with {stochastic_est} points:')
-                        logger.info(f'  > results: {str_floatL(stochastic_results, float_prec=8)}')
-                        logger.info(f'  > std_dev: {msmx(stochastic_results)["std"]:.8f}\n')
+                        st_nfo = f'\nstochastic estimation with {stochastic_est} points:\n'
+                        st_nfo += f'> results: {str_floatL(stochastic_results, float_prec=8)}\n'
+                        st_nfo += f'> std_dev: {msmx(stochastic_results)["std"]:.8f}'
+                        logger.info(st_nfo)
 
                 else:
                     sr = srl.add_result(
@@ -277,7 +241,7 @@ def hpmser(
                         srp =  f'{sr.id} {sr.smooth_score:{pf}} [{sr.score:{pf}} {difs}] {top_SR.id}:{dist_to_max:.3f}'
                         srp += f'  avg/mom:{avg_dst:.3f}/{mom_dst:.3f}  {time_passed}s'
                         if new_sampling_config: srp += f'  new sampling config: {sampling_config}'
-                        logger.info(f'\n{srp}')
+                        logger.info(srp)
 
                         # new MAX report
                         if gots_new_max:

@@ -6,17 +6,17 @@
 
 **hpmser** is a tool for searching optimal hyper-parameters of any function. Assuming there is a function:
 
-`    def some_function(a,b,c,d) -> float`
+`def some_function(a,b,c,d) -> float`
 
-**hpmser()** will search for values of **a,b,c,d** that MAXIMIZE return value of given function.
+**hpmser** will search for values of `a,b,c,d` that MAXIMIZE return value of given function.
 
 To start the search process you will need to:
-- give a **func** (type)
-- pass to **func_psdd** parameters space definition (with PSDD - check `pypaq.pms.base.py` for details)
-- if some parameters are *known constants*, you may pass their values to **func_const**
-- configure **devices** used and optionally advanced hpmser parameters
+- give a `func` (type)
+- pass to `func_psdd` parameters space definition (with PSDD - check `pypaq.pms.base.py` for details)
+- if some parameters are *known constants*, you may pass their values to `func_const`
+- configure `devices`, `n_loops` and optionally other advanced hpmser parameters
 
-You can check `/tests` for run example. There is also a project: https://github.com/piteren/hpmser_rastrigin
+You can check `/examples` for sample run code.<br>There is also a project: https://github.com/piteren/hpmser_rastrigin
 that uses **hpmser**.
 
 ------------
@@ -25,10 +25,11 @@ that uses **hpmser**.
 - optimal space sampling based on current space knowledge (currently obtained results interpolation), with
 - random search
 
-**hpmser** supports:
+**hpmser** features:
 - multiprocessing (runs with subprocesses) with CPU & GPU devices with **devices** param - check `pypaq.mpython.devices` for details
 - exceptions handling, keyboard interruption without a crash
-- live process configuration and fine-tuning
+- process auto-adjustment
+- process fine-tuning by user (while running)
 - process saving & resuming
 - 3D visualisation of parameters and function values
 - TensorBoard logging

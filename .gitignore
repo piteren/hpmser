@@ -2,5 +2,6 @@ __pycache__
 .idea/
 build/
 dist/
+examples/_hpmser
 hpmser.egg-info/
 tests/_tmp/
