@@ -1,7 +1,7 @@
 import random
 import unittest
 
-from helpers import str_floatL
+from hpmser.helpers import str_floatL
 
 
 class TestHelpers(unittest.TestCase):

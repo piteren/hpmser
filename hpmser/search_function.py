@@ -62,17 +62,18 @@ def hpmser(
                 self,
                 func: Callable,
                 func_const: Optional[POINT],
-                devices: DevicesPypaq = None):
+                device: DevicesPypaq= None):
 
             self.func = func
             self.func_const = func_const if func_const else {}
-            self.devices = devices
+            self.device = device
 
             # manage 'device'/'devices' & 'hpmser_mode' param in func >> set it in func if needed
             func_args = get_params(self.func)
             func_args = list(func_args['with_defaults'].keys()) + func_args['without_defaults']
             for k in ['device','devices']:
-                if k in func_args: self.func_const[k] = self.devices
+                if k in func_args:
+                    self.func_const[k] = self.device
             if 'hpmser_mode' in func_args: self.func_const['hpmser_mode'] = True
 
         # processes given spoint, passes **kwargs
