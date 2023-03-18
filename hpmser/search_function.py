@@ -120,7 +120,7 @@ def hpmser(
 
     devices = get_devices(devices=devices, torch_namespace=False) # manage devices
     num_free_rw = len(devices)
-    logger.info(f'> hpmser resolved given devices to: {devices}')
+    logger.info(f'> hpmser resolved given devices to ({len(devices)}): {devices}')
 
     ompr = OMPRunner(
         rw_class=               HRW,
