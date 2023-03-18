@@ -60,6 +60,7 @@ class SRL(Sized):
 
     def __get_srl_path(self, save_dir: str) -> str: return f'{save_dir}/{self.name}.srl'
 
+
     def __get_srl_backup_path(self, save_dir: str) -> str: return f'{save_dir}/{self.name}.srl.backup'
 
     # loads (alternatively from backup)
@@ -107,6 +108,7 @@ class SRL(Sized):
             return self.__srL[0]
         return None
 
+
     def get_SR(self, id: int) -> SeRes or None:
         for sr in self.__srL:
             if sr.id == id: return sr
@@ -120,6 +122,7 @@ class SRL(Sized):
         if type(pa) is SRL.SeRes: pa = pa.point
         if type(pb) is SRL.SeRes: pb = pb.point
         return self.paspa.distance(pa, pb)
+
 
     def get_avg_dst(self): return self.__avg_dst
 
@@ -328,11 +331,13 @@ class SRL(Sized):
 
         self.__smoothed_and_sorted = True
 
+
     def log_distances(self):
         for dl in self.__distances:
             s = ''
             for d in dl: s += f'{d:.2f} '
             self.logger.info(s)
+
 
     def nice_str(
             self,
@@ -407,5 +412,9 @@ class SRL(Sized):
             z_name=     columns[2],
             val_name=   columns[3],
             save_FD=    folder)
+
+    @property
+    def np_smooth(self) -> int:
+        return self.__np_smooth
 
     def __len__(self): return len(self.__srL)

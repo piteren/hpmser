@@ -81,9 +81,10 @@ def hpmser(
 
     prep_folder(f'{hpmser_FD}/{name}') # needs to be created for ConfigManager
     config_manager = ConfigManager(
-        file=           f'{hpmser_FD}/{name}/hpmser.conf',
+        file_FP=        f'{hpmser_FD}/{name}/hpmser.conf',
         config=         SAMPLING_CONFIG_INITIAL,
-        try_to_load=    True)
+        try_to_load=    True,
+        logger=         logger)
     sampling_config = config_manager.get_config() # update in case of read from existing file
 
     tbwr = TBwr(logdir=f'{hpmser_FD}/{name}') if do_TB else None
@@ -121,17 +122,16 @@ def hpmser(
     num_free_rw = len(devices)
     logger.info(f'> hpmser resolved given devices to: {devices}')
 
-    omp = OMPRunner(
+    ompr = OMPRunner(
         rw_class=               HRW,
         rw_init_kwargs=         {'func': func, 'func_const':func_const},
         rw_lifetime=            1,
         devices=                devices,
-        name=                   'OMPR_NB_Hpmser',
+        name=                   'OMPRunner_hpmser',
         ordered_results=        False,
         log_RWW_exception=      logger.level < 20 or raise_exceptions,
         raise_RWW_exception=    logger.level < 11 or raise_exceptions,
-        logger=                 get_child(logger=logger, name='omp', change_level=10)
-    )
+        logger=                 get_child(logger=logger, name='ompr', change_level=10))
 
     if update_config == 'auto':
         update_config = n_loops // 2 if type(n_loops) is int else 1000
@@ -143,18 +143,17 @@ def hpmser(
     try:
         while True:
 
-            new_sampling_config = config_manager.load()
-            if new_sampling_config: sampling_config.update(new_sampling_config)
-            if 'np_smooth' in new_sampling_config: srl.set_np_smooth(sampling_config['np_smooth'])
+            sampling_config = config_manager.load()
+            if sampling_config['np_smooth'] != srl.np_smooth:
+                srl.set_np_smooth(sampling_config['np_smooth'])
 
             # use all available devices
             while num_free_rw:
-                logger.debug(f' >> got {num_free_rw} free RW at {sample_num} sample_num start')
+                logger.debug(f'> got {num_free_rw} free RW at {sample_num} sample_num start')
 
                 if sample_num == update_config:
-                    logger.info(f' > updating sampling config..')
-                    new_sampling_config = config_manager.update(**SAMPLING_CONFIG_UPD)
-                    sampling_config.update(new_sampling_config)
+                    logger.info(f'> updating sampling config with SAMPLING_CONFIG_UPD..')
+                    sampling_config = config_manager.update(**SAMPLING_CONFIG_UPD)
 
                 # fill stochastic points after 50 samples
                 if sample_num == 50:
@@ -185,13 +184,13 @@ def hpmser(
                     'est_score':        est_score,
                     's_time':           time.time()}
 
-                omp.process(task)
+                ompr.process(task)
                 num_free_rw -= 1
                 sample_num += 1
 
-            msg = omp.get_result(block=True) # get one result
+            msg = ompr.get_result(block=True) # get one result
             num_free_rw += 1
-            if type(msg) is dict: # we may receive str here (like: 'TASK #4 RAISED EXCEPTION') from omp that not restarts exceptions
+            if type(msg) is dict: # str may be received here (like: 'TASK #4 RAISED EXCEPTION') from ompr that does not restart exceptions
 
                 msg_sample_num =    msg['sample_num']
                 msg_score =         msg['score']
@@ -212,7 +211,7 @@ def hpmser(
                     sr = srl.add_result(
                         point=  msg_spoint,
                         score=  msg_score)
-                    logger.debug(f' >> got result #{msg_sample_num}')
+                    logger.debug(f'> got result #{msg_sample_num}')
 
                     pf = f'.{srl.prec}f' # update precision of print
 
@@ -240,7 +239,6 @@ def hpmser(
 
                         srp =  f'{sr.id} {sr.smooth_score:{pf}} [{sr.score:{pf}} {difs}] {top_SR.id}:{dist_to_max:.3f}'
                         srp += f'  avg/mom:{avg_dst:.3f}/{mom_dst:.3f}  {time_passed}s'
-                        if new_sampling_config: srp += f'  new sampling config: {sampling_config}'
                         logger.info(srp)
 
                         # new MAX report
@@ -291,7 +289,7 @@ def hpmser(
         raise e
 
     finally:
-        omp.exit()
+        ompr.exit()
 
         srl.save(folder=f'{hpmser_FD}/{name}')
 
