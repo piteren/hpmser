@@ -55,7 +55,7 @@ def hpmser(
         loglevel=                                   20
 ) -> SRL:
 
-    if add_stamp: name = f'{name}_{stamp(letters=0)}'
+    if add_stamp: name = f'{name}_{stamp()}'
 
     prep_folder(hpmser_FD) # create folder if needed
 
@@ -64,7 +64,7 @@ def hpmser(
     results_FDL = sorted(os.listdir(hpmser_FD))
     if len(results_FDL):
         print(f'There are {len(results_FDL)} searches in \'{hpmser_FD}\'')
-        print('do you want to continue with the last one ({results_FDL[-1]})? .. waiting 10 sec (y/n, n-default)')
+        print(f'do you want to continue with the last one ({results_FDL[-1]})? .. waiting 10 sec (y/n, n-default)')
         i, o, e = select.select([sys.stdin], [], [], 10)
         if i and sys.stdin.readline().strip() == 'y':
             name = results_FDL[-1]  # take last
