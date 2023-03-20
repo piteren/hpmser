@@ -250,9 +250,9 @@ def hpmser(
                             dp = srl.paspa.distance(prev_sr.point, top_SR.point) if prev_sr else 0
 
                             msr += f' dst_prev:{dp:.3f}\n'
-                            for nps in NPE:
-                                ss_np, avd, all_sc = srl.smooth_point(top_SR, nps)
-                                msr += f'  NPS:{nps} {ss_np:{pf}} [{max(all_sc):{pf}}-{min(all_sc):{pf}}] {avd:.3f}\n'
+                            for npe in NPE:
+                                ss_np, avd, all_sc = srl.smooth_point(top_SR, npe)
+                                msr += f'  NPE:{npe} {ss_np:{pf}} [{max(all_sc):{pf}}-{min(all_sc):{pf}}] {avd:.3f}\n'
                             logger.info(f'\n{msr}')
 
                         if top_show_freq and len(srl) % top_show_freq == 0:
