@@ -43,14 +43,14 @@ def hpmser(
         update_config: Optional[Union[int,str]]=    'auto',     # update config after n loops
         name: str=                                  'hpmser',   # hpmser run name
         add_stamp=                                  True,       # adds short stamp to name, when name given
-        use_GX=                                     True,       # uses genetic xrossing while sampling top points
+        use_GX=                                     True,       # uses Genetic Xrossing while sampling top points
         distance_L2=                                True,       # use L2(True) or L1(False) for distance calculation
         stochastic_est: Optional[int]=              3,          # number of samples used for stochastic estimation, for 0 or None does not estimate
         plot_axes: Optional[List[str]]=             None,       # preferred axes for plot, put here a list of up to 3 params names ['param1',..]
         top_show_freq=                              20,         # how often top results summary will be printed
         raise_exceptions=                           True,       # forces subprocesses to raise + print exceptions (raising subprocess exception does not break hpmser process)
         hpmser_FD: str=                             '_hpmser',  # save folder
-        do_TB=                                      True,       # plots with TB
+        do_TB=                                      True,       # plots hpmser stats with TB
         logger=                                     None,
         loglevel=                                   20
 ) -> SRL:
