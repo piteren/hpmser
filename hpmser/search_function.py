@@ -17,11 +17,11 @@ from hpmser.helpers import str_floatL, HRW
 from hpmser.search_results import SRL
 
 
-NP_SMOOTH = [3,5,9] # numbers of points for smoothing
+NPE = [3,5,9] # numbers of points for ANNE (Averaged Nearest Neighbour Estimation)
 
 # initial hpmser configuration
 SAMPLING_CONFIG_INITIAL = {
-    'np_smooth':    3,      # number of points used for smoothing
+    'npe':          3,      # number of points for ANNE
     'prob_opt':     0.3,    # probability of sampling from estimated space (optimized)
     'n_opt':        30,     # number of samples taken from estimated space
     'prob_top':     0.3,    # probability of sampling from the area of top points
@@ -144,8 +144,8 @@ def hpmser(
         while True:
 
             sampling_config = config_manager.load()
-            if sampling_config['np_smooth'] != srl.np_smooth:
-                srl.set_np_smooth(sampling_config['np_smooth'])
+            if sampling_config['npe'] != srl.npe:
+                srl.set_npe(sampling_config['npe'])
 
             # use all available devices
             while num_free_rw:
@@ -213,7 +213,7 @@ def hpmser(
                         score=  msg_score)
                     logger.debug(f'> got result #{msg_sample_num}')
 
-                    pf = f'.{srl.prec}f' # update precision of print
+                    pf = f'.{srl._prec}f' # update precision of print
 
                     avg_dst = srl.get_avg_dst()
                     mom_dst = srl.get_mom_dst()
@@ -231,26 +231,26 @@ def hpmser(
                     # current sr report
                     if logger.level < 21:
 
-                        dif = sr.smooth_score - msg_est_score
+                        dif = sr.estimate - msg_est_score
                         difs = f'{"+" if dif>0 else "-"}{abs(dif):{pf}}'
 
                         dist_to_max = srl.paspa.distance(top_SR.point, sr.point)
                         time_passed = int(time.time() - msg_s_time)
 
-                        srp =  f'{sr.id} {sr.smooth_score:{pf}} [{sr.score:{pf}} {difs}] {top_SR.id}:{dist_to_max:.3f}'
+                        srp =  f'{sr.id} {sr.estimate:{pf}} [{sr.score:{pf}} {difs}] {top_SR.id}:{dist_to_max:.3f}'
                         srp += f'  avg/mom:{avg_dst:.3f}/{mom_dst:.3f}  {time_passed}s'
                         logger.info(srp)
 
                         # new MAX report
                         if gots_new_max:
 
-                            msr = f'_newMAX: {top_SR.id} {top_SR.smooth_score:{pf}} [{top_SR.score:{pf}}] {point_str(top_SR.point)}\n'
+                            msr = f'_newMAX: {top_SR.id} {top_SR.estimate:{pf}} [{top_SR.score:{pf}}] {point_str(top_SR.point)}\n'
 
                             prev_sr = srl.get_SR(prev_max_sr_id)
                             dp = srl.paspa.distance(prev_sr.point, top_SR.point) if prev_sr else 0
 
                             msr += f' dst_prev:{dp:.3f}\n'
-                            for nps in NP_SMOOTH:
+                            for nps in NPE:
                                 ss_np, avd, all_sc = srl.smooth_point(top_SR, nps)
                                 msr += f'  NPS:{nps} {ss_np:{pf}} [{max(all_sc):{pf}}-{min(all_sc):{pf}}] {avd:.3f}\n'
                             logger.info(f'\n{msr}')
@@ -263,7 +263,7 @@ def hpmser(
                             diff = int(speed - (sum(top_speed_save) / len(top_speed_save)))
                             logger.info(f' ### hpmser speed: {speed} sec/task, diff: {"+" if diff >=0 else "-"}{abs(diff)} sec')
 
-                            logger.info(srl.nice_str(n_top=4, top_nps=NP_SMOOTH, all_nps=None))
+                            logger.info(srl.nice_str(n_top=4, top_npe=NPE, all_npe=None))
 
                     if tbwr:
                         scores_all.append(sr.score)
@@ -293,7 +293,7 @@ def hpmser(
 
         srl.save(folder=f'{hpmser_FD}/{name}')
 
-        results_str = srl.nice_str(top_nps=NP_SMOOTH)
+        results_str = srl.nice_str(top_npe=NPE)
         if hpmser_FD:
             with open( f'{hpmser_FD}/{name}/{name}_results.txt', 'w') as file: file.write(results_str)
         logger.info(f'\n{results_str}')
