@@ -110,7 +110,7 @@ def hpmser(
     stochastic_points = {}
     stochastic_results = []
 
-    avg_dst = srl.get_avg_dst()
+    avg_dst = srl.avg_dst
     sample_num = len(srl) # number of next sample that will be taken and sent for processing
 
     curr_max_sr_id = None if not len(srl) else srl.get_top_SR().id  # current max SeRes id
@@ -215,7 +215,7 @@ def hpmser(
 
                     pf = f'.{srl._prec}f' # update precision of print
 
-                    avg_dst = srl.get_avg_dst()
+                    avg_dst = srl.avg_dst
                     mom_dst = srl.get_mom_dst()
                     srl.save(folder=f'{hpmser_FD}/{name}')
 

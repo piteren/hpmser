@@ -56,7 +56,7 @@ class SRL(Sized):
         self._sorted_and_estmated = True   # SRL status: is sorted & estimated
         self._distances = []               # distances cache (by SeRes id)
         self._scores = []                  # scores cache (by SeRes id)
-        self._avg_dst = 1                  # average distance of SRL for self._npe
+        self._avg_dst = 1                  # average distance (of all SeRes in SRL) limited to self._npe
         self._prec = 8                     # print precision, will be updated while adding new points
 
     # ****************************************************************************************************** load & save
@@ -129,10 +129,6 @@ class SRL(Sized):
         if type(pa) is SRL.SeRes: pa = pa.point
         if type(pb) is SRL.SeRes: pb = pb.point
         return self.paspa.distance(pa, pb)
-
-
-    def get_avg_dst(self):
-        return self._avg_dst
 
     # max of min distances of SRL: max(min_distance)
     def get_mom_dst(self):
@@ -430,5 +426,8 @@ class SRL(Sized):
     def npe(self) -> int:
         return self._npe
 
+    @property
+    def avg_dst(self):
+        return self._avg_dst
 
     def __len__(self): return len(self._srL)
