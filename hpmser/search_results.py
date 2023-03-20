@@ -9,25 +9,25 @@ from typing import Sized, List, Tuple, Optional, Iterable
 from hpmser.helpers import str_floatL
 
 
+# single Search Result
+class SeRes:
+
+    def __init__(
+            self,
+            point: POINT,
+            score: Optional[float]= None # score of SeRes
+    ):
+        self.id: Optional[int] = None           # to be updated by SRL (id = len(SRL))
+        self.point = point
+        self.score = score
+        self.estimate: Optional[float] = None   # to be updated by SRL
+
+    def __str__(self):
+        return f'SeRes: id:{self.id}, point:{self.point}, score:{self.score}, estimate:{self.estimate}'
+
+
 # Search Results List [SeRes] with some methods
 class SRL(Sized):
-
-    # single Search Result
-    class SeRes:
-
-        def __init__(
-                self,
-                point: POINT,
-                score: Optional[float]= None # score of SeRes
-        ):
-            self.id: Optional[int] = None           # to be updated by SRL (id = len(SRL))
-            self.point = point
-            self.score = score
-            self.estimate: Optional[float] = None   # to be updated by SRL
-
-        def __str__(self):
-            return f'SeRes: id:{self.id}, point:{self.point}, score:{self.score}, estimate:{self.estimate}'
-
 
     def __init__(
             self,
@@ -52,7 +52,7 @@ class SRL(Sized):
         self.plot_axes = plot_axes
 
 
-        self._srL: List[SRL.SeRes] = []    # sorted periodically by estimate
+        self._srL: List[SeRes] = []    # sorted periodically by estimate
         self._sorted_and_estmated = True   # SRL status: is sorted & estimated
         self._distances = []               # distances cache (by SeRes id)
         self._scores = []                  # scores cache (by SeRes id)
@@ -124,10 +124,10 @@ class SRL(Sized):
     def get_distance(self,
             pa: POINT or SeRes,
             pb: POINT or SeRes) -> float:
-        if type(pa) is SRL.SeRes and type(pb) is SRL.SeRes:
+        if type(pa) is SeRes and type(pb) is SeRes:
             return self._distances[pa.id][pb.id]
-        if type(pa) is SRL.SeRes: pa = pa.point
-        if type(pb) is SRL.SeRes: pb = pb.point
+        if type(pa) is SeRes: pa = pa.point
+        if type(pb) is SeRes: pb = pb.point
         return self.paspa.distance(pa, pb)
 
     # max of min distances of SRL: max(min_distance)
@@ -232,7 +232,7 @@ class SRL(Sized):
         else:
             id_dst = \
                 list(zip(range(len(self._srL)), self._distances[point.id])) \
-                    if type(point) is SRL.SeRes else \
+                    if type(point) is SeRes else \
                     [(sr.id, self.get_distance(point, sr.point)) for sr in self._srL]
             id_dst.sort(key=lambda x: x[1]) # sort by distance to this point
             return [self.get_SR(id[0]) for id in id_dst[:n]]
@@ -250,7 +250,7 @@ class SRL(Sized):
             force_no_update=    False # aborts: calculation of estimate & sorting
     ) -> SeRes:
 
-        sr = SRL.SeRes(point=point, score=score)
+        sr = SeRes(point=point, score=score)
         sr.id = len(self._srL)
 
         # update cached distances
@@ -293,7 +293,7 @@ class SRL(Sized):
         if self._srL:
             score_dst = \
                 list(zip(self._scores, self._distances[point.id])) \
-                    if type(point) is SRL.SeRes else \
+                    if type(point) is SeRes else \
                     [(sr.score, self.get_distance(point, sr.point)) for sr in self._srL]
             score_dst.sort(key=lambda x: x[1])  # sort by distance to this point
             score_dst_np = score_dst[:npe + 1] # trim to npe points (+1 point for reference)
