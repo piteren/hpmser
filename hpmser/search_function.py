@@ -6,7 +6,7 @@ from pypaq.lipytools.stats import msmx
 from pypaq.lipytools.pylogger import get_pylogger, get_child
 from pypaq.mpython.devices import DevicesPypaq, get_devices
 from pypaq.pms.config_manager import ConfigManager
-from pypaq.pms.paspa import PaSpa
+from pypaq.pms.space.paspa import PaSpa
 from pypaq.pms.base import PSDD, POINT, point_str
 import sys, select
 import time
@@ -17,7 +17,7 @@ from hpmser.helpers import str_floatL, HRW
 from hpmser.search_results import SRL
 
 
-NPE = [3,5,9] # numbers of points for ANNE (Averaged Nearest Neighbour Estimation)
+NPE = [3,5,9] # numbers of points for ANNE (Averaged Nearest Neighbours Estimation)
 
 # initial hpmser configuration
 SAMPLING_CONFIG_INITIAL = {
@@ -44,7 +44,6 @@ def hpmser(
         name: str=                                  'hpmser',   # hpmser run name
         add_stamp=                                  True,       # adds short stamp to name, when name given
         use_GX=                                     True,       # uses Genetic Xrossing while sampling top points
-        distance_L2=                                True,       # use L2(True) or L1(False) for distance calculation
         stochastic_est: Optional[int]=              3,          # number of samples used for stochastic estimation, for 0 or None does not estimate
         plot_axes: Optional[List[str]]=             None,       # preferred axes for plot, put here a list of up to 3 params names ['param1',..]
         top_show_freq=                              20,         # how often top results summary will be printed
@@ -63,14 +62,18 @@ def hpmser(
     srl = None
     results_FDL = sorted(os.listdir(hpmser_FD))
     if len(results_FDL):
+
         print(f'There are {len(results_FDL)} searches in \'{hpmser_FD}\'')
+
         print(f'do you want to continue with the last one ({results_FDL[-1]})? .. waiting 10 sec (y/n, n-default)')
         i, o, e = select.select([sys.stdin], [], [], 10)
+
         if i and sys.stdin.readline().strip() == 'y':
             name = results_FDL[-1]  # take last
             srl = SRL(name=name, logger=logger)
             srl.load(f'{hpmser_FD}/{name}')
-            assert PaSpa(psdd=func_psdd, distance_L2=distance_L2) == srl.paspa, 'ERR: parameters space differs - cannot continue!'
+            if PaSpa(psdd=func_psdd) != srl.paspa:
+                raise Exception('parameters space differs - cannot continue with this saved search')
 
     if not logger:
         logger = get_pylogger(
@@ -94,9 +97,8 @@ def hpmser(
 
     if not srl: srl = SRL(
         paspa=  PaSpa(
-            psdd=           func_psdd,
-            distance_L2=    distance_L2,
-            logger=         get_child(logger=logger, name='paspa', change_level=10)),
+            psdd=   func_psdd,
+            logger= get_child(logger=logger, name='paspa', change_level=10)),
         name=   name,
         logger= logger)
     srl.plot_axes = plot_axes

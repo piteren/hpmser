@@ -1,7 +1,7 @@
 from pypaq.lipytools.files import r_pickle, w_pickle
 from pypaq.lipytools.plots import three_dim
 from pypaq.lipytools.pylogger import get_pylogger
-from pypaq.pms.paspa import PaSpa
+from pypaq.pms.space.paspa import PaSpa
 from pypaq.pms.base import POINT, point_str
 import random
 from typing import Sized, List, Tuple, Optional, Iterable
@@ -15,7 +15,7 @@ class SeRes:
     def __init__(
             self,
             point: POINT,
-            score: Optional[float]= None # score of SeRes
+            score: Optional[float]= None # point score
     ):
         self.id: Optional[int] = None           # to be updated by SRL (id = len(SRL))
         self.point = point
@@ -51,25 +51,24 @@ class SRL(Sized):
         self._npe = npe        # current NPE of SRL
         self.plot_axes = plot_axes
 
-
-        self._srL: List[SeRes] = []    # sorted periodically by estimate
-        self._sorted_and_estmated = True   # SRL status: is sorted & estimated
-        self._distances = []               # distances cache (by SeRes id)
-        self._scores = []                  # scores cache (by SeRes id)
-        self._avg_dst = 1                  # average distance (of all SeRes in SRL) limited to self._npe
-        self._prec = 8                     # print precision, will be updated while adding new points
+        self._srL: List[SeRes] = []                 # sorted periodically by estimate
+        self._sorted_and_estmated = True            # SRL status: is sorted & estimated
+        self._distances: List[List[float]] = []     # distances cache (by SeRes id)
+        self._scores: List[float] = []              # scores cache (by SeRes id)
+        self._avg_dst = 1                           # average distance (of all SeRes in SRL) limited to self._npe
+        self._prec = 8                              # print precision, will be updated while adding new points
 
     # ****************************************************************************************************** load & save
 
-    def _get_srl_path(self, save_dir: str) -> str:
+    def _get_srl_path(self, save_dir:str) -> str:
         return f'{save_dir}/{self.name}.srl'
 
 
-    def _get_srl_backup_path(self, save_dir: str) -> str:
+    def _get_srl_backup_path(self, save_dir:str) -> str:
         return f'{save_dir}/{self.name}.srl.backup'
 
     # loads (alternatively from backup)
-    def load(self, save_dir :str):
+    def load(self, save_dir:str):
 
         self.logger.info(f' > SRL {self.name} loading form {save_dir}..')
 
@@ -105,7 +104,7 @@ class SRL(Sized):
     # ************************************************************************************************ getters & setters
 
     # returns top SeRes (max estimate)
-    def get_top_SR(self) -> SeRes or None:
+    def get_top_SR(self) -> Optional[SeRes]:
         if self._srL:
             if not self._sorted_and_estmated:
                 self.logger.warning('SRL asked to return top SR while SRL is not smoothed_and_sorted, running smooth_and_sort()')
@@ -114,16 +113,18 @@ class SRL(Sized):
         return None
 
 
-    def get_SR(self, id: int) -> SeRes or None:
+    def get_SR(self, id:int) -> Optional[SeRes]:
         for sr in self._srL:
             if sr.id == id:
                 return sr
         return None
 
     # returns distance between two points, if points are SeRes type uses cached distance
-    def get_distance(self,
+    def get_distance(
+            self,
             pa: POINT or SeRes,
-            pb: POINT or SeRes) -> float:
+            pb: POINT or SeRes,
+    ) -> float:
         if type(pa) is SeRes and type(pb) is SeRes:
             return self._distances[pa.id][pb.id]
         if type(pa) is SeRes: pa = pa.point
@@ -131,7 +132,7 @@ class SRL(Sized):
         return self.paspa.distance(pa, pb)
 
     # max of min distances of SRL: max(min_distance)
-    def get_mom_dst(self):
+    def get_mom_dst(self) -> float:
         return max([min(d[1:]) if d[1:] else 0 for d in self._distances])
 
     # returns sample with policy and estimated score
@@ -140,13 +141,16 @@ class SRL(Sized):
             n_opt,      # number of optimized samples
             prob_top,   # probability of sample from area of top
             n_top,      # number of top samples
-            avg_dst     # distance for sample from area of top
+            avg_dst,    # distance for sample from area of top
     ) -> Tuple[POINT,float]:
 
         prob_rnd = 1 - prob_opt - prob_top
         if random.random() < prob_rnd or len(self._srL) < 10: sample = self.paspa.sample_point_GX() # one random point
         else:
-            if random.random() < prob_opt/(prob_top+prob_opt): points = [self.paspa.sample_point_GX() for _ in range(n_opt + 1)] # some random points ...last for reference
+
+            if random.random() < prob_opt/(prob_top+prob_opt):
+                points = [self.paspa.sample_point_GX() for _ in range(n_opt + 1)] # some random points ..last for reference
+
             # top points
             else:
                 n_top += 1 # last for reference
@@ -159,16 +163,12 @@ class SRL(Sized):
 
             all_pw = list(zip(points, scores))
             all_pw.sort(key=lambda x: x[1], reverse=True)
-            maxs = all_pw[0][1]
             subs = all_pw.pop(-1)[1]
-            mins = all_pw[-1][1]
 
             all_p, all_w = zip(*all_pw)
             all_w = [w - subs for w in all_w]
             all_p = list(all_p)
             sample = random.choices(all_p, weights=all_w, k=1)[0]
-            pf = f'.{self._prec}f'
-            #print(f'   % sampled #{all_p.index(sample)}/{len(all_p)} from: {maxs:{pf}}-{mins:{pf}} {str_floatL(all_w, float_prec=self._prec)}')
 
         est_score, _, _ =  self.smooth_point(sample)
 
@@ -226,9 +226,13 @@ class SRL(Sized):
             self,
             point: POINT or SeRes,
             n: Optional[int]=   None) -> List[SeRes]:
-        if not n: n = self._npe
+
+        if not n:
+            n = self._npe
+
         if len(self._srL) <= n:
             return [] + self._srL
+
         else:
             id_dst = \
                 list(zip(range(len(self._srL)), self._distances[point.id])) \
@@ -247,7 +251,7 @@ class SRL(Sized):
     def add_result(self,
             point: POINT,
             score: float,
-            force_no_update=    False # aborts: calculation of estimate & sorting
+            force_no_update=    False, # aborts calculation of estimate & sorting
     ) -> SeRes:
 
         sr = SeRes(point=point, score=score)
@@ -341,13 +345,6 @@ class SRL(Sized):
         self._sorted_and_estmated = True
 
 
-    def log_distances(self):
-        for dl in self._distances:
-            s = ''
-            for d in dl: s += f'{d:.2f} '
-            self.logger.info(s)
-
-
     def nice_str(
             self,
             n_top=                  20,
@@ -430,4 +427,6 @@ class SRL(Sized):
     def avg_dst(self):
         return self._avg_dst
 
-    def __len__(self): return len(self._srL)
+
+    def __len__(self):
+        return len(self._srL)
