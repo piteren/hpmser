@@ -145,14 +145,13 @@ class PointsCloud(Sized):
             if len(columns) < 4:
                 columns += ['value']
                 valLL = [vl + [sp.value] for vl,sp in zip(valLL, self._vpointsD.values())]
-
             three_dim(
                 xyz=        valLL,
                 name=       name,
                 x_name=     columns[0],
                 y_name=     columns[1],
                 z_name=     columns[2],
-                val_name=   'value',
+                val_name=   'val',
                 save_FD=    folder)
 
     @property

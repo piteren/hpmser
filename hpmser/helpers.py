@@ -1,8 +1,13 @@
 from ompr.runner import RunningWorker
 from pypaq.mpython.devices import DevicesPypaq
 from pypaq.pms.paspa import PaSpa
-from pypaq.pms.base import POINT, get_params
+from pypaq.pms.base import POINT, PSDD, get_params
+from pypaq.lipytools.files import w_pickle, r_pickle
+from pypaq.lipytools.pylogger import get_child
 from typing import Callable, Optional, List, Any, Tuple
+
+from hpmser.points_cloud import PointsCloud
+from hpmser.space_estimator import SpaceEstimator
 
 
 # hpmser RunningWorker (process run by OMP in hpmser)
@@ -44,6 +49,44 @@ class HRW(RunningWorker):
         msg.update(kwargs)
         return msg
 
+# saves hpmser session
+def save(
+        psdd: PSDD,
+        pcloud: PointsCloud,
+        estimator: SpaceEstimator,
+        folder: str):
+    data = {
+        'psdd':             psdd,
+        'vpoints':          pcloud.vpoints,
+        'estimator_type':   type(estimator),
+        'estimator_state':  estimator.state}
+    w_pickle(data, f'{folder}/hpmser.save')
+    w_pickle(data, f'{folder}/hpmser.save.back')
+
+# loads hpmser session
+def load(folder:str, logger) -> Tuple[PSDD, PointsCloud, SpaceEstimator]:
+
+    try:
+        data = r_pickle(f'{folder}/hpmser.save')
+    except Exception as e:
+        logger.warning(f'got exception: {e} while loading hpmser, using backup file')
+        data = r_pickle(f'{folder}/hpmser.save.back')
+
+    psdd = data['psdd']
+
+    paspa = PaSpa(
+        psdd=   psdd,
+        logger= get_child(logger=logger, name='paspa', change_level=10))
+
+    pcloud = PointsCloud(
+        paspa=  paspa,
+        logger= logger)
+    pcloud.update_cloud(vpoints=data['vpoints'])
+
+    estimator = data['estimator_type'].from_state(state=data['estimator_state'])
+    estimator.update_vpoints(vpoints=data['vpoints'], paspa=paspa)
+
+    return psdd, pcloud, estimator
 
 # returns nice string of floats list
 def str_floatL(
@@ -88,19 +131,3 @@ def fill_up(
         if n_added == num: break
 
     return n_added, added_ix
-
-# _/^ flat s_val >> linear transformation from s_val to e_val >> flat e_val
-def val_linear(
-        s_val: float,
-        e_val: float,
-        sf: float,
-        ef: float,
-        counter: int,
-        max_count: int,
-) -> float:
-    x = counter / max_count         # where we are in time (x)
-    y = (x-sf)/(1-sf-ef)            # how high we are
-    if y<0: y=0
-    if y>1: y=1
-    val = s_val + (e_val-s_val)*y   # final value
-    return val

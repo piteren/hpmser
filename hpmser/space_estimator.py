@@ -1,9 +1,10 @@
+from abc import ABC, abstractmethod
 import numpy as np
 from pypaq.pytypes import NPL
 from pypaq.pms.base import PMSException
 from pypaq.pms.paspa import PaSpa
 from sklearn.svm import SVR
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Dict
 
 from hpmser.points_cloud import VPoint
 
@@ -26,7 +27,7 @@ def loss(
     return sum([(a - b) ** 2 for a, b in zip(preds, y_new)]) / len(y_new)
 
 
-class SpaceEstimator:
+class SpaceEstimator(ABC):
 
     # extracts X & y from vpoints ands space
     @staticmethod
@@ -64,6 +65,20 @@ class SpaceEstimator:
     def fitted(self) -> bool:
         return False
 
+    # Estimator state
+    @property
+    def state(self) -> Dict:
+        return {}
+
+    @classmethod
+    @abstractmethod
+    def from_state(cls, state:Dict):
+        pass
+
+
+    def __str__(self):
+        return 'SpaceEstimator'
+
 
 # SVR RBF based Space Estimator
 class RBFRegressor(SpaceEstimator):
@@ -75,8 +90,6 @@ class RBFRegressor(SpaceEstimator):
 
     def __init__(
             self,
-            c_ix: int=      0,
-            g_ix: int=      0,
             epsilon: float= 0.01,
             num_tries: int= 2,  # how many times param with next ix needs to improve to increase ix
     ):
@@ -84,12 +97,7 @@ class RBFRegressor(SpaceEstimator):
         self._epsilon = epsilon
         self._num_tries = num_tries
 
-        if c_ix >= len(RBFRegressor.VAL['c']):
-            raise PMSException(f'given \'c_ix\' ({c_ix}) too large, must be less than {len(RBFRegressor.VAL["c"])}')
-        if g_ix >= len(RBFRegressor.VAL['g']):
-            raise PMSException(f'given \'g_ix\' ({g_ix}) too large, must be less than {len(RBFRegressor.VAL["g"])}')
-
-        self._indexes = {'c':c_ix, 'g':g_ix}
+        self._indexes =  {'c':0, 'g':0}
         self._improved = {'c':0, 'g':0}
 
         self._model = self._build_model()
@@ -188,6 +196,20 @@ class RBFRegressor(SpaceEstimator):
     def fitted(self) -> bool:
         return self._fitted
 
+    @property
+    def state(self) -> Dict:
+        return {
+            'indexes':      self._indexes,
+            'epsilon':      self._epsilon,
+            'num_tries':    self._num_tries,
+            'improved':     self._improved}
+
+    @classmethod
+    def from_state(cls, state:Dict):
+        reg = cls(epsilon=state['epsilon'], num_tries=state['num_tries'])
+        reg._indexes = state['indexes']
+        reg._improved = state['improved']
+        return reg
 
     def __str__(self):
         c = RBFRegressor.VAL['c'][self._indexes['c']]

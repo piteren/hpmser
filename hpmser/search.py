@@ -2,6 +2,8 @@ from ompr.runner import OMPRunner
 from pypaq.lipytools.printout import stamp
 from pypaq.lipytools.moving_average import MovAvg
 from pypaq.lipytools.pylogger import get_pylogger, get_child
+from pypaq.lipytools.plots import three_dim
+from pypaq.lipytools.double_hinge import double_hinge
 from pypaq.mpython.devices import DevicesPypaq, get_devices
 from pypaq.pms.paspa import PaSpa
 from pypaq.pms.base import PSDD, POINT, point_str
@@ -10,7 +12,7 @@ import time
 from torchness.tbwr import TBwr
 from typing import Callable, Optional, List, Dict, Tuple
 
-from hpmser.helpers import HRW, fill_up, val_linear
+from hpmser.helpers import HRW, fill_up, save, load
 from hpmser.points_cloud import PointsCloud, VPoint
 from hpmser.space_estimator import SpaceEstimator, RBFRegressor, loss
 
@@ -39,10 +41,12 @@ def hpmser(
 
     if add_stamp: name = f'{name}_{stamp()}'
 
+    run_folder = f'{hpmser_FD}/{name}'
+
     if not logger:
         logger = get_pylogger(
             name=       name,
-            folder=     f'{hpmser_FD}/{name}',
+            folder=     run_folder,
             level=      loglevel,
             format=     '%(asctime)s : %(message)s')
 
@@ -59,12 +63,15 @@ def hpmser(
         logger= get_child(logger=logger, name='paspa', change_level=10))
     logger.info(f'\n{paspa}')
 
-    pcloud = PointsCloud(
-        paspa=  paspa,
-        name=   name,
-        logger= logger)
+    pcloud = PointsCloud(paspa=paspa, logger=logger)
 
     estimator = estimator_type()
+
+    # estimator plot (test) elements
+    test_points = [VPoint(paspa.sample_point()) for _ in range(1000)]
+    xyz = [[vp.point[a] for a in plot_axes] for vp in test_points]
+    columns = [] + plot_axes
+    if len(columns) < 3: columns += ['estimation']
 
     devices = get_devices(devices=devices, torch_namespace=False) # manage devices
     num_free_rw = len(devices)
@@ -106,14 +113,26 @@ def hpmser(
                 avg_nearest = pcloud.avg_nearest
                 pf = f'.{pcloud.prec}f'  # update precision of print
 
-                if len(pcloud) % (5 * update_size) == 0:
-                    pcloud.plot(axes=plot_axes)
+                pcloud.plot(
+                    name=   'values',
+                    axes=   plot_axes,
+                    folder= run_folder)
 
                 estimator_loss_new = estimator.update_vpoints(vpoints=vpoints_for_update, space=paspa)
                 estimation = estimator.predict_vpoints(vpoints=vpoints_evaluated, space=paspa)
 
                 vpoints_estimated = sorted(zip(vpoints_evaluated, estimation), key=lambda x:x[1], reverse=True)
                 estimator_loss_all = loss(model=estimator, y_new=[sp.value for sp in vpoints_evaluated], preds=estimation)
+
+                test_estimation = estimator.predict_vpoints(vpoints=test_points, space=paspa)
+                three_dim(
+                    xyz=        [v+[e] for v,e in zip(xyz,test_estimation)],
+                    name=       'estimator',
+                    x_name=     columns[0],
+                    y_name=     columns[1],
+                    z_name=     columns[2],
+                    val_name=   'est',
+                    save_FD=    run_folder)
 
                 tbwr.add(pcloud.min_nearest, 'hpmser/1.nearest_min', sample_num)
                 tbwr.add(avg_nearest,        'hpmser/2.nearest_avg', sample_num)
@@ -141,7 +160,11 @@ def hpmser(
 
                 vpoints_for_update = []
 
-                # TODO: save here all
+                save(
+                    psdd=       func_psdd,
+                    pcloud=     pcloud,
+                    estimator=  estimator,
+                    folder=     run_folder)
 
             if break_loop: break
 
@@ -165,14 +188,14 @@ def hpmser(
 
                 points_known = [sp.point for sp in vpoints_evaluated] + list(points_at_workers.values()) # POINTs we already sampled
 
-                estimated_factor = val_linear(sf=time_explore, ef=time_exploit, counter=sample_num, max_count=n_loops,
-                    s_val=  0.0,
-                    e_val=  1.0)
+                estimated_factor = double_hinge(sf=time_explore, ef=time_exploit, counter=sample_num, max_count=n_loops,
+                                                s_val=  0.0,
+                                                e_val=  1.0)
                 num_estimated_points = round(estimated_factor * (n_needed - len(points_to_evaluate))) if estimator.fitted else 0
 
-                avg_nearest_start_factor = val_linear(sf=time_explore, ef=time_exploit, counter=sample_num, max_count=n_loops,
-                    s_val=  1.0,
-                    e_val=  0.1)
+                avg_nearest_start_factor = double_hinge(sf=time_explore, ef=time_exploit, counter=sample_num, max_count=n_loops,
+                                                        s_val=  1.0,
+                                                        e_val=  0.1)
                 min_dist = avg_nearest * avg_nearest_start_factor
                 while num_estimated_points:
 
@@ -266,18 +289,16 @@ def hpmser(
 
     finally:
 
-        """
-        srl.save(folder=f'{hpmser_FD}/{name}')
-
-        results_str = srl.nice_str(top_npe=NPE)
-        if hpmser_FD:
-            with open( f'{hpmser_FD}/{name}/{name}_results.txt', 'w') as file: file.write(results_str)
-        logger.info(f'\n{results_str}')
-        """
+        save(
+            psdd=       func_psdd,
+            pcloud=     pcloud,
+            estimator=  estimator,
+            folder=     run_folder)
 
         ompr.exit()
 
         vpoints_evaluated = pcloud.vpoints
-        estimation = estimator.predict_vpoints(vpoints=vpoints_evaluated, space=paspa)
+        estimation = estimator.predict_vpoints(vpoints=vpoints_evaluated, space=paspa) if estimator.fitted else [0]*len(vpoints_evaluated)
         vpoints_estimated = sorted(zip(vpoints_evaluated, estimation), key=lambda x: x[1], reverse=True)
+
         return vpoints_estimated
