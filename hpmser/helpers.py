@@ -1,7 +1,9 @@
 from ompr.runner import RunningWorker
 from pypaq.mpython.devices import DevicesPypaq
 from pypaq.pms.base import POINT, get_params
-from typing import Callable, Optional, List, Any
+from typing import Callable, Optional, List, Any, Tuple
+
+from pypaq.pms.paspa import PaSpa
 
 
 # hpmser RunningWorker (process run by OMP in hpmser)
@@ -25,21 +27,21 @@ class HRW(RunningWorker):
                 self.func_const[k] = self.device
         if 'hpmser_mode' in func_args: self.func_const['hpmser_mode'] = True
 
-    # processes given spoint, passes **kwargs
+    # processes given point (computes value), passes **kwargs
     def process(
             self,
-            spoint: POINT,
+            point: POINT,
             **kwargs) -> Any:
 
-        spoint_with_defaults = {}
-        spoint_with_defaults.update(self.func_const)
-        spoint_with_defaults.update(spoint)
+        point_with_defaults = {}
+        point_with_defaults.update(self.func_const)
+        point_with_defaults.update(point)
 
-        res = self.func(**spoint_with_defaults)
-        if type(res) is dict: score = res['score']
-        else:                 score = res
+        res = self.func(**point_with_defaults)
+        if type(res) is dict: value = res['value']
+        else:                 value = res
 
-        msg = {'spoint':spoint, 'score':score}
+        msg = {'point':point, 'value':value}
         msg.update(kwargs)
         return msg
 
@@ -58,3 +60,48 @@ def str_floatL(
     else:
         for w in all_w: ws += f'{w:.{float_prec}f} '
     return f'{ws[:-1]}]'
+
+# appends POINTs fr >> to until given size reached, POINT cannot be closer than min_dist to any from to+other
+def fill_up(
+        fr: List[POINT],
+        to: List[POINT],
+        other: List[POINT],
+        num: int,
+        paspa: PaSpa,
+        min_dist: float,
+) -> Tuple[int,List[int]]:
+
+    n_added = 0
+    added_ix = []
+    for ix,pc in enumerate(fr):
+
+        candidate_ok = True
+        for pr in to + other:
+            if paspa.distance(pr, pc) < min_dist:
+                candidate_ok = False
+                break
+
+        if candidate_ok:
+            to.append(pc)
+            n_added += 1
+            added_ix.append(ix)
+
+        if n_added == num: break
+
+    return n_added, added_ix
+
+# _/^ flat s_val >> linear transformation from s_val to e_val >> flat e_val
+def val_linear(
+        s_val: float,
+        e_val: float,
+        sf: float,
+        ef: float,
+        counter: int,
+        max_count: int,
+) -> float:
+    x = counter / max_count         # where we are in time (x)
+    y = (x-sf)/(1-sf-ef)            # how high we are
+    if y<0: y=0
+    if y>1: y=1
+    val = s_val + (e_val-s_val)*y   # final value
+    return val

@@ -7,7 +7,7 @@ import unittest
 
 from tests.envy import flush_tmp_dir
 
-from hpmser.search_function import hpmser
+from hpmser.search import hpmser
 
 HPMSER_FD = f'{flush_tmp_dir()}/hpmser'
 
