@@ -1,12 +1,10 @@
 import math
-from typing import Sized, List, Tuple, Optional, Dict, Union
-
-from pypaq.lipytools.files import r_pickle, w_pickle
 from pypaq.lipytools.pylogger import get_pylogger
 from pypaq.lipytools.stats import mam
 from pypaq.lipytools.plots import three_dim
 from pypaq.pms.base import POINT
 from pypaq.pms.paspa import PaSpa
+from typing import Sized, List, Tuple, Optional, Dict, Union
 
 
 # Valued Point, with id & value
@@ -30,19 +28,14 @@ class PointsCloud(Sized):
 
     def __init__(
             self,
-            paspa: PaSpa,                   # space of this PointsCloud
-            name: Optional[str]=    None,
-            logger=                 None,
-            loglevel=               20,
-    ):
-
-        if name is None: name = self.__class__.__name__
-        self.name = name
+            paspa: PaSpa,   # space of this PointsCloud
+            logger=     None,
+            loglevel=   20):
 
         if not logger:
             logger = get_pylogger(level=loglevel)
         self.logger = logger
-        self.logger.info(f'*** PointsCloud : {self.name} *** initializing..')
+        self.logger.info('*** PointsCloud *** initializing..')
 
         self.paspa = paspa
 
@@ -55,7 +48,7 @@ class PointsCloud(Sized):
 
         self.prec = 8 # print precision, will be updated while adding new vpoints
 
-
+    """
     def _get_srl_path(self, save_dir:str) -> str:
         return f'{save_dir}/{self.name}.srl'
 
@@ -93,7 +86,7 @@ class PointsCloud(Sized):
 
         w_pickle(self, self._get_srl_path(folder))
         #self.plot(folder=folder)
-
+    """
     # returns distance between two vpoints
     def distance(self, vpa:VPoint, vpb:VPoint) -> float:
         return self.paspa.distance(vpa.point, vpb.point)
@@ -134,38 +127,32 @@ class PointsCloud(Sized):
     # prepares 3D plot of Cloud
     def plot(
             self,
-            axes: Optional[List[str]]=  None,   # list with axes names (max 3), eg: ['drop_a','drop_b','loss']
-            #estimate=                   True,   # for True color_"axis" == estimate, else score
+            name: str=                  'PointsCloud',
+            axes: Optional[List[str]]=  None,   # list with axes names, 2-3, like ['drop_a','drop_b','loss']
             folder: Optional[str]=      None):
 
         columns = sorted(list(self._vpointsD[0].point.keys()))[:3] if not axes else [] + axes
-        valLL = [[sp.point[key] for key in columns] for sp in self._vpointsD.values()]
 
-        # eventually add score
-        if len(columns) < 3:
-            valLL = [vl + [sp.value] for vl,sp in zip(valLL, self._vpointsD.values())]
-            columns += ['score']
+        if len(columns) < 2:
+            self.logger.warning('Cannot prepare 3D plot for less than two axes')
 
-        """
-        # eventually add estimate (for one real axis)
-        if len(columns) < 3:
-            valLL = [vl + [sp.estimate] for vl,sp in zip(valLL, self._vpointsD.values())]
-            columns += ['estimate']
-        """
+        else:
 
-        # add color "axis" data
-        #columns += ['score']
-        #valLL = [vl + [sp.score] for vl,sp in zip(valLL, self._vpointsD.values())]
-        #print(valLL[0])
+            valLL = [[sp.point[key] for key in columns] for sp in self._vpointsD.values()]
 
-        three_dim(
-            xyz=        valLL,
-            name=       self.name,
-            x_name=     columns[0],
-            y_name=     columns[1],
-            z_name=     columns[2],
-            #val_name=   columns[3],
-            save_FD=    folder)
+            # eventually add score
+            if len(columns) < 4:
+                columns += ['value']
+                valLL = [vl + [sp.value] for vl,sp in zip(valLL, self._vpointsD.values())]
+
+            three_dim(
+                xyz=        valLL,
+                name=       name,
+                x_name=     columns[0],
+                y_name=     columns[1],
+                z_name=     columns[2],
+                val_name=   'value',
+                save_FD=    folder)
 
     @property
     def vpoints(self) -> List[VPoint]:
