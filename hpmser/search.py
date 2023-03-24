@@ -5,15 +5,14 @@ from pypaq.lipytools.pylogger import get_pylogger, get_child
 from pypaq.mpython.devices import DevicesPypaq, get_devices
 from pypaq.pms.paspa import PaSpa
 from pypaq.pms.base import PSDD, POINT, point_str
-from hpmser.points_cloud import PointsCloud, VPoint
-from hpmser.space_estimator import SpaceEstimator, RBFRegressor, loss
 import random
 import time
 from torchness.tbwr import TBwr
 from typing import Callable, Optional, List, Dict, Tuple
 
 from hpmser.helpers import HRW, fill_up, val_linear
-
+from hpmser.points_cloud import PointsCloud, VPoint
+from hpmser.space_estimator import SpaceEstimator, RBFRegressor, loss
 
 
 # Hyper Parameters Searching Function (based on OMPR engine)

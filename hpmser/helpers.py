@@ -1,9 +1,8 @@
 from ompr.runner import RunningWorker
 from pypaq.mpython.devices import DevicesPypaq
+from pypaq.pms.paspa import PaSpa
 from pypaq.pms.base import POINT, get_params
 from typing import Callable, Optional, List, Any, Tuple
-
-from pypaq.pms.paspa import PaSpa
 
 
 # hpmser RunningWorker (process run by OMP in hpmser)
