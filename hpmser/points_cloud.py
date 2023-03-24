@@ -24,6 +24,7 @@ class VPoint:
         return f'SeRes: id:{self.id}, point:{self.point}, value:{self.value}'
 
 
+# cloud of Valued Points
 class PointsCloud(Sized):
 
     def __init__(

@@ -26,7 +26,7 @@ class HRW(RunningWorker):
                 self.func_const[k] = self.device
         if 'hpmser_mode' in func_args: self.func_const['hpmser_mode'] = True
 
-    # processes given point (computes value), passes **kwargs
+    # processes given point - computes value
     def process(
             self,
             point: POINT,
