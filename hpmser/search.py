@@ -43,11 +43,11 @@ def hpmser(
         loglevel=                               20,
 ) -> List[Tuple[VPoint,float]]:
 
+    prep_folder(hpmser_FD)
+
     ### check for continuation
 
     name_cont = None
-
-    prep_folder(hpmser_FD)
 
     results_FDL = sorted(os.listdir(hpmser_FD))
     old_results = []
@@ -59,11 +59,11 @@ def hpmser(
 
         name_cont = old_results[-1]  # take last
         print(f'There are {len(old_results)} old searches in \'{hpmser_FD}\' folder')
-        print(f'do you want to continue with the last one ({name_cont})? .. waiting 10 sec (y/n, n-default)')
+        print(f'do you want to continue with the last one: {name_cont} ? .. waiting 10 sec (y/n, n-default)')
 
         i, o, e = select.select([sys.stdin], [], [], 10)
-        if i and sys.stdin.readline().strip() == 'y': pass
-        else: name_cont = None
+        if not (i and sys.stdin.readline().strip() == 'y'):
+            name_cont = None
 
     if name_cont:   name = name_cont
     elif add_stamp: name = f'{name}_{stamp()}'
@@ -119,7 +119,7 @@ def hpmser(
         raise_RWW_exception=    logger.level < 11 or raise_exceptions,
         logger=                 get_child(logger=logger, name='ompr', change_level=10))
 
-    tbwr = TBwr(logdir=f'{hpmser_FD}/{name}') if do_TB else None
+    tbwr = TBwr(logdir=run_folder) if do_TB else None
 
     sample_num = len(pcloud)  # number of next sample that will be taken and sent for processing
 
@@ -136,7 +136,8 @@ def hpmser(
     try:
         while True:
 
-            # update cloud, update estimator, prepare report
+            ### update cloud, update estimator, prepare report
+
             if len(vpoints_for_update) == update_size:
 
                 pcloud.update_cloud(vpoints=vpoints_for_update) # add to Cloud
