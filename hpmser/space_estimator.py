@@ -196,6 +196,7 @@ class RBFRegressor(SpaceEstimator):
     def fitted(self) -> bool:
         return self._fitted
 
+    # returns object state
     @property
     def state(self) -> Dict:
         return {
@@ -204,6 +205,7 @@ class RBFRegressor(SpaceEstimator):
             'num_tries':    self._num_tries,
             'improved':     self._improved}
 
+    # builds object from a state
     @classmethod
     def from_state(cls, state:Dict):
         reg = cls(epsilon=state['epsilon'], num_tries=state['num_tries'])

@@ -10,6 +10,11 @@ from hpmser.points_cloud import PointsCloud
 from hpmser.space_estimator import SpaceEstimator
 
 
+
+class HPMSERException(Exception):
+    pass
+
+
 # hpmser RunningWorker (process run by OMP in hpmser)
 class HRW(RunningWorker):
 
@@ -64,7 +69,7 @@ def save(
     w_pickle(data, f'{folder}/hpmser.save.back')
 
 # loads hpmser session
-def load(folder:str, logger) -> Tuple[PSDD, PointsCloud, SpaceEstimator]:
+def load(folder:str, logger) -> Tuple[PSDD, PaSpa, PointsCloud, SpaceEstimator]:
 
     try:
         data = r_pickle(f'{folder}/hpmser.save')
@@ -84,9 +89,9 @@ def load(folder:str, logger) -> Tuple[PSDD, PointsCloud, SpaceEstimator]:
     pcloud.update_cloud(vpoints=data['vpoints'])
 
     estimator = data['estimator_type'].from_state(state=data['estimator_state'])
-    estimator.update_vpoints(vpoints=data['vpoints'], paspa=paspa)
+    estimator.update_vpoints(vpoints=data['vpoints'], space=paspa)
 
-    return psdd, pcloud, estimator
+    return psdd, paspa, pcloud, estimator
 
 # returns nice string of floats list
 def str_floatL(

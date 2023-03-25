@@ -49,45 +49,6 @@ class PointsCloud(Sized):
 
         self.prec = 8 # print precision, will be updated while adding new vpoints
 
-    """
-    def _get_srl_path(self, save_dir:str) -> str:
-        return f'{save_dir}/{self.name}.srl'
-
-
-    def _get_srl_backup_path(self, save_dir:str) -> str:
-        return f'{save_dir}/{self.name}.srl.backup'
-
-    # loads (alternatively from backup)
-    def load(self, save_dir:str):
-
-        self.logger.info(f' > SRL {self.name} loading form {save_dir}..')
-
-        try:
-            obj = r_pickle(self._get_srl_path(save_dir))
-        except Exception as e:
-            self.logger.warning(f' SRL {self.name} got exception: {str(e)} while loading, using backup file')
-            obj = r_pickle(self._get_srl_backup_path(save_dir))
-
-        self.paspa =        obj.paspa
-        self._vpointsD =      obj._vpointsD
-        self._nearest =     obj._nearest
-        self.min_nearest =  obj.min_nearest
-        self.avg_nearest =  obj.avg_nearest
-        self.max_nearest =  obj.max_nearest
-        self.prec=         obj.prec
-
-        self.logger.info(f'> PointsCloud loaded {len(self)} vpoints')
-
-    # saves with backup
-    def save(self, folder :str):
-
-        # backup copy previous
-        old_res = r_pickle(self._get_srl_path(folder))
-        if old_res: w_pickle(old_res, self._get_srl_backup_path(folder))
-
-        w_pickle(self, self._get_srl_path(folder))
-        #self.plot(folder=folder)
-    """
     # returns distance between two vpoints
     def distance(self, vpa:VPoint, vpb:VPoint) -> float:
         return self.paspa.distance(vpa.point, vpb.point)

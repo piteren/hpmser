@@ -1,4 +1,6 @@
 from ompr.runner import OMPRunner
+import os
+from pypaq.lipytools.files import prep_folder
 from pypaq.lipytools.printout import stamp
 from pypaq.lipytools.moving_average import MovAvg
 from pypaq.lipytools.pylogger import get_pylogger, get_child
@@ -8,11 +10,13 @@ from pypaq.mpython.devices import DevicesPypaq, get_devices
 from pypaq.pms.paspa import PaSpa
 from pypaq.pms.base import PSDD, POINT, point_str
 import random
+import select
+import sys
 import time
 from torchness.tbwr import TBwr
 from typing import Callable, Optional, List, Dict, Tuple
 
-from hpmser.helpers import HRW, fill_up, save, load
+from hpmser.helpers import HPMSERException, HRW, fill_up, save, load
 from hpmser.points_cloud import PointsCloud, VPoint
 from hpmser.space_estimator import SpaceEstimator, RBFRegressor, loss
 
@@ -39,7 +43,30 @@ def hpmser(
         loglevel=                               20,
 ) -> List[Tuple[VPoint,float]]:
 
-    if add_stamp: name = f'{name}_{stamp()}'
+    ### check for continuation
+
+    name_cont = None
+
+    prep_folder(hpmser_FD)
+
+    results_FDL = sorted(os.listdir(hpmser_FD))
+    old_results = []
+    for f in results_FDL:
+        if 'hpmser.save' in os.listdir(f'{hpmser_FD}/{f}'):
+            old_results.append(f)
+
+    if len(old_results):
+
+        name_cont = old_results[-1]  # take last
+        print(f'There are {len(old_results)} old searches in \'{hpmser_FD}\' folder')
+        print(f'do you want to continue with the last one ({name_cont})? .. waiting 10 sec (y/n, n-default)')
+
+        i, o, e = select.select([sys.stdin], [], [], 10)
+        if i and sys.stdin.readline().strip() == 'y': pass
+        else: name_cont = None
+
+    if name_cont:   name = name_cont
+    elif add_stamp: name = f'{name}_{stamp()}'
 
     run_folder = f'{hpmser_FD}/{name}'
 
@@ -50,7 +77,18 @@ def hpmser(
             level=      loglevel,
             format=     '%(asctime)s : %(message)s')
 
-    logger.info(f'*** hpmser : {name} *** started for: {func.__name__}')
+    cont_nfo = ', continuing' if name_cont else ''
+    logger.info(f'*** hpmser : {name} *** started for: {func.__name__}{cont_nfo}')
+
+    if name_cont:
+        psdd, paspa, pcloud, estimator = load(folder=f'{hpmser_FD}/{name}', logger=logger)
+        if psdd != func_psdd:
+            raise HPMSERException('parameters space differs - cannot continue!')
+    else:
+        paspa_logger = get_child(logger=logger, name='paspa', change_level=10)
+        paspa = PaSpa(psdd=func_psdd, logger=paspa_logger)
+        pcloud = PointsCloud(paspa=paspa, logger=logger)
+        estimator = estimator_type()
 
     # update n_loops
     if n_loops % update_size != 0:
@@ -58,14 +96,7 @@ def hpmser(
         n_loops = (int(n_loops / update_size) + 1) * update_size
         logger.info(f'> updated n_loops from {n_loops_old} to {n_loops}')
 
-    paspa = PaSpa(
-        psdd=   func_psdd,
-        logger= get_child(logger=logger, name='paspa', change_level=10))
     logger.info(f'\n{paspa}')
-
-    pcloud = PointsCloud(paspa=paspa, logger=logger)
-
-    estimator = estimator_type()
 
     # estimator plot (test) elements
     test_points = [VPoint(paspa.sample_point()) for _ in range(1000)]
@@ -79,7 +110,7 @@ def hpmser(
 
     ompr = OMPRunner(
         rw_class=               HRW,
-        rw_init_kwargs=         {'func': func, 'func_const':func_const},
+        rw_init_kwargs=         {'func':func, 'func_const':func_const},
         rw_lifetime=            1,
         devices=                devices,
         name=                   'OMPRunner_hpmser',
