@@ -29,8 +29,8 @@ def hpmser(
         devices: DevicesPypaq=                  None,       # devices to use for search, check pypaq.mpython.devices
         n_loops: int=                           500,        # number of search loops, should be multiplier of update_estimator_loops
         update_size=                            20,         # frequency of estimator & pcloud update
-        time_explore: float=                    0.2,        # factor of loops (from the beginning) with 100% random exploration of space
-        time_exploit: float=                    0.2,        # factor of loops (from the end) with 100% exploitation of gained knowledge
+        explore: float=                         0.2,        # factor of loops (from the beginning) with 100% random exploration of space
+        exploit: float=                         0.2,        # factor of loops (from the end) with 100% exploitation of gained knowledge
         plot_axes: Optional[List[str]]=         None,       # preferred axes for plot, put here a list of up to 3 params names ['param1',..]
         name: str=                              'hpmser',   # hpmser run name
         add_stamp=                              True,       # adds short stamp to name, when name given
@@ -220,14 +220,16 @@ def hpmser(
 
                 points_known = [sp.point for sp in vpoints_evaluated] + list(points_at_workers.values()) # POINTs we already sampled
 
-                estimated_factor = double_hinge(sf=time_explore, ef=time_exploit, counter=sample_num, max_count=n_loops,
-                                                s_val=  0.0,
-                                                e_val=  1.0)
+                estimated_factor = double_hinge(
+                    sf=explore, ef=exploit, counter=sample_num, max_count=n_loops,
+                    s_val=  0.0,
+                    e_val=  1.0)
                 num_estimated_points = round(estimated_factor * (n_needed - len(points_to_evaluate))) if estimator.fitted else 0
 
-                avg_nearest_start_factor = double_hinge(sf=time_explore, ef=time_exploit, counter=sample_num, max_count=n_loops,
-                                                        s_val=  1.0,
-                                                        e_val=  0.1)
+                avg_nearest_start_factor = double_hinge(
+                    sf=explore, ef=exploit, counter=sample_num, max_count=n_loops,
+                    s_val=  1.0,
+                    e_val=  0.1)
                 min_dist = avg_nearest * avg_nearest_start_factor
                 while num_estimated_points:
 
