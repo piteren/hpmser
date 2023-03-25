@@ -43,6 +43,11 @@ def hpmser(
         loglevel=                               20,
 ) -> List[Tuple[VPoint,float]]:
 
+    if plot_axes:
+        not_in_psdd = [a for a in plot_axes if a not in func_psdd]
+        if not_in_psdd:
+            raise HPMSERException(f'given plot_axes not present in psdd: {not_in_psdd}, cannot continue')
+
     prep_folder(hpmser_FD)
 
     ### check for continuation
@@ -142,24 +147,22 @@ def hpmser(
 
                 pcloud.update_cloud(vpoints=vpoints_for_update) # add to Cloud
                 vpoints_evaluated = pcloud.vpoints
-                avg_nearest = pcloud.avg_nearest
                 pf = f'.{pcloud.prec}f'  # update precision of print
 
                 pcloud.plot(
-                    name=   'values',
+                    name=   f'VALUES_{name}',
                     axes=   plot_axes,
                     folder= run_folder)
 
                 estimator_loss_new = estimator.update_vpoints(vpoints=vpoints_for_update, space=paspa)
                 estimation = estimator.predict_vpoints(vpoints=vpoints_evaluated, space=paspa)
-
                 vpoints_estimated = sorted(zip(vpoints_evaluated, estimation), key=lambda x:x[1], reverse=True)
                 estimator_loss_all = loss(model=estimator, y_new=[sp.value for sp in vpoints_evaluated], preds=estimation)
 
                 test_estimation = estimator.predict_vpoints(vpoints=test_points, space=paspa)
                 three_dim(
                     xyz=        [v+[e] for v,e in zip(xyz,test_estimation)],
-                    name=       'estimator',
+                    name=       f'ESTIMATOR_{name}',
                     x_name=     columns[0],
                     y_name=     columns[1],
                     z_name=     columns[2],
@@ -167,7 +170,7 @@ def hpmser(
                     save_FD=    run_folder)
 
                 tbwr.add(pcloud.min_nearest, 'hpmser/1.nearest_min', sample_num)
-                tbwr.add(avg_nearest,        'hpmser/2.nearest_avg', sample_num)
+                tbwr.add(pcloud.avg_nearest, 'hpmser/2.nearest_avg', sample_num)
                 tbwr.add(pcloud.max_nearest, 'hpmser/3.nearest_max', sample_num)
                 tbwr.add(estimator_loss_all, 'hpmser/4.estimator_loss_all', sample_num)
                 tbwr.add(estimator_loss_new, 'hpmser/5.estimator_loss_new', sample_num)
@@ -175,7 +178,7 @@ def hpmser(
                 speed = (time.time() - time_update) / update_size
                 time_update = time.time()
                 diff = speed - time_update_mavg.upd(speed)
-                logger.info(f'___speed: {speed:.1}s/task, diff: {"+" if diff >= 0 else "-"}{abs(diff):.1}s')
+                logger.info(f'___speed: {speed:.1f}s/task, diff: {"+" if diff >= 0 else "-"}{abs(diff):.1f}s')
 
                 nfo = f'TOP {report_N_top} vpoints by estimate (estimator: {estimator})\n'
                 for vpe in vpoints_estimated[:report_N_top]:
@@ -216,7 +219,6 @@ def hpmser(
                     points_to_evaluate += [cpa, cpb]
 
                 vpoints_evaluated = pcloud.vpoints  # vpoints currently evaluated (all)
-                avg_nearest = pcloud.avg_nearest
 
                 points_known = [sp.point for sp in vpoints_evaluated] + list(points_at_workers.values()) # POINTs we already sampled
 
@@ -230,7 +232,7 @@ def hpmser(
                     sf=explore, ef=exploit, counter=sample_num, max_count=n_loops,
                     s_val=  1.0,
                     e_val=  0.1)
-                min_dist = avg_nearest * avg_nearest_start_factor
+                min_dist = pcloud.avg_nearest * avg_nearest_start_factor
                 while num_estimated_points:
 
                     points_candidates = [paspa.sample_point() for _ in range(n_needed*10*2)] # TODO *2 for error filter
@@ -257,7 +259,7 @@ def hpmser(
                     min_dist = min_dist * 0.9
 
                 # fill up with random
-                min_dist = avg_nearest
+                min_dist = pcloud.avg_nearest
                 n_addedL = []
                 while len(points_to_evaluate) < n_needed:
                     n_added, _ = fill_up(
@@ -279,7 +281,7 @@ def hpmser(
             while num_free_rw and points_to_evaluate:
                 logger.debug(f'> got {num_free_rw} free RW at {sample_num} sample_num start')
 
-                point = points_to_evaluate.pop()
+                point = points_to_evaluate.pop(0)
                 task = {
                     'point':        point,
                     'sample_num':   sample_num,
