@@ -6,6 +6,7 @@ from pypaq.lipytools.moving_average import MovAvg
 from pypaq.lipytools.pylogger import get_pylogger, get_child
 from pypaq.lipytools.plots import three_dim
 from pypaq.lipytools.double_hinge import double_hinge
+from pypaq.lipytools.stats import mam
 from pypaq.mpython.devices import DevicesPypaq, get_devices
 from pypaq.pms.paspa import PaSpa
 from pypaq.pms.base import PSDD, POINT, point_str
@@ -66,7 +67,7 @@ def hpmser(
         print(f'There are {len(old_results)} old searches in \'{hpmser_FD}\' folder')
         print(f'do you want to continue with the last one: {name_cont} ? .. waiting 10 sec (y/n, n-default)')
 
-        i, o, e = select.select([sys.stdin], [], [], 10)
+        i, o, est = select.select([sys.stdin], [], [], 10)
         if not (i and sys.stdin.readline().strip() == 'y'):
             name_cont = None
 
@@ -174,6 +175,10 @@ def hpmser(
                 tbwr.add(pcloud.max_nearest, 'hpmser/3.nearest_max', sample_num)
                 tbwr.add(estimator_loss_all, 'hpmser/4.estimator_loss_all', sample_num)
                 tbwr.add(estimator_loss_new, 'hpmser/5.estimator_loss_new', sample_num)
+                emin, eavg, emax = mam(test_estimation)
+                tbwr.add(emin, 'hpmser/6.test_estimation_min', sample_num)
+                tbwr.add(eavg, 'hpmser/7.test_estimation_avg', sample_num)
+                tbwr.add(emax, 'hpmser/8.test_estimation_max', sample_num)
 
                 speed = (time.time() - time_update) / update_size
                 time_update = time.time()
@@ -182,11 +187,10 @@ def hpmser(
 
                 nfo = f'TOP {report_N_top} vpoints by estimate (estimator: {estimator})\n'
                 for vpe in vpoints_estimated[:report_N_top]:
-                    vp, e = vpe
-                    diff = e - vp.value
+                    vp, est = vpe
+                    diff = vp.value - est
                     diff_nfo = f'{"+" if diff > 0 else "-"}{abs(diff):{pf}}'
-                    est_nfo = f'{e:{pf}} {diff_nfo}'
-                    nfo += f'{vp.id:4} {vp.value:{pf}} [{est_nfo}] {point_str(vp.point)}\n'
+                    nfo += f'#{vp.id:4} est: {est:{pf}} [val: {vp.value:{pf}} {diff_nfo}] {point_str(vp.point)}\n'
                 logger.info(nfo[:-1])
 
                 # check for main loop break condition
@@ -274,7 +278,7 @@ def hpmser(
                 print(f'*randomly added {n_addedL}')
 
                 random.shuffle(points_to_evaluate)
-                tbwr.add(time.time()-s_time, 'hpmser/6.sampling_time', sample_num)
+                tbwr.add(time.time()-s_time, 'hpmser/9.sampling_time', sample_num)
 
             ### run tasks with available devices
 
@@ -306,22 +310,23 @@ def hpmser(
                 vpoints_for_update.append(vpoint)
 
                 est_nfo = ''
+                diff_nfo = ''
                 vpoint_est = estimator.predict_vpoints(vpoints=[vpoint], space=paspa)[0] if estimator.fitted else None
                 if vpoint_est is not None:
-                    diff = vpoint_est - vpoint.value
-                    diff_nfo = f'{"+" if diff>0 else "-"}{abs(diff):{pf}}'
-                    est_nfo = f' [{vpoint_est:{pf}} {diff_nfo}]'
+                    est_nfo = f' est: {vpoint_est:{pf}}'
+                    diff = vpoint.value - vpoint_est
+                    diff_nfo = f' {"+" if diff>0 else "-"}{abs(diff):{pf}}'
 
                 time_taken = time.time() - msg_s_time
-                logger.info(f'#{msg_sample_num:4} value: {vpoint.value:{pf}}{est_nfo} ({time_taken:.1f}s) {point_str(vpoint.point)}')
+                logger.info(f'#{msg_sample_num:4}{est_nfo} [val: {vpoint.value:{pf}}{diff_nfo}] ({time_taken:.1f}s) {point_str(vpoint.point)}')
 
     except KeyboardInterrupt:
         logger.warning(' > hpmser_GX KeyboardInterrupt-ed..')
         raise KeyboardInterrupt # raise exception for OMPRunner
 
-    except Exception as e:
-        logger.error(f'hpmser Exception: {str(e)}')
-        raise e
+    except Exception as est:
+        logger.error(f'hpmser Exception: {est}')
+        raise est
 
     finally:
 
