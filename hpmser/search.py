@@ -53,11 +53,6 @@ class HPMSer:
             loglevel=                               20,
     ):
 
-        if plot_axes:
-            not_in_psdd = [a for a in plot_axes if a not in func_psdd]
-            if not_in_psdd:
-                raise HPMSERException(f'given plot_axes not present in psdd: {not_in_psdd}, cannot continue')
-
         self.func = func
         self.func_psdd = func_psdd
         self.func_const = func_const
@@ -134,6 +129,14 @@ class HPMSer:
             n_loops_old = n_loops
             n_loops = (int(n_loops / update_size) + 1) * update_size
             self.logger.info(f'> updated n_loops from {n_loops_old} to {n_loops} (to be multiplier of update_size)')
+
+        # handle axes
+        if plot_axes:
+            not_in_psdd = [a for a in plot_axes if a not in func_psdd]
+            if not_in_psdd:
+                raise HPMSERException(f'given plot_axes not present in psdd: {not_in_psdd}, cannot continue')
+        else:
+            plot_axes = list(func_psdd.keys())[:3]
 
         self.run_results = self._run(
             n_loops=        n_loops,
