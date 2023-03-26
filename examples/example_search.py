@@ -2,7 +2,7 @@ import math
 import time
 from typing import Optional
 
-from hpmser.search_function import hpmser
+from hpmser.search import HPMSer
 
 
 def some_function(x:float, y:int, z:Optional[bool]) -> float:
@@ -27,7 +27,7 @@ if __name__ == "__main__":
         'z':    (None,False,True),  # set of 3 values
     }
 
-    hpmser(
+    HPMSer(
         func=       some_function,
         func_psdd=  psdd,
         devices=    0.5,            # half of system CPUs
