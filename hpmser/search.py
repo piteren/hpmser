@@ -335,7 +335,7 @@ class HPMSer:
 
                 msg = self.ompr.get_result(block=True) # get one result
                 num_free_rw += 1
-                if type(msg) is dict: # str may be received here (like: 'TASK #4 RAISED EXCEPTION') from ompr that does not restart exceptions
+                if type(msg) is dict: # str may be received here (like: 'exception while processing task XX: xxx') from ompr that does not restart exceptions
 
                     msg_sample_num =    msg['sample_num']
                     msg_s_time =        msg['s_time']
