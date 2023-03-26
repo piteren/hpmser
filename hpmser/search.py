@@ -113,14 +113,14 @@ class HPMSer:
             self.pcloud = PointsCloud(paspa=self.paspa, logger=self.logger)
             self.estimator = estimator_type()
 
-        self.devices = get_devices(devices=devices, torch_namespace=False) # manage devices
-        self.logger.info(f'> hpmser resolved given devices ({len(self.devices)}): {self.devices}')
+        devices = get_devices(devices=devices, torch_namespace=False) # manage devices
+        self.logger.info(f'> hpmser resolved given devices ({len(devices)}): {devices}')
 
         self.ompr = OMPRunner(
             rw_class=               HRW,
             rw_init_kwargs=         {'func':func, 'func_const':func_const},
             rw_lifetime=            1,
-            devices=                self.devices,
+            devices=                devices,
             name=                   'OMPRunner_hpmser',
             ordered_results=        False,
             log_RWW_exception=      self.logger.level < 20 or raise_exceptions,
@@ -128,8 +128,6 @@ class HPMSer:
             logger=                 get_child(logger=self.logger, name='ompr', change_level=10))
 
         self.tbwr = TBwr(logdir=self.run_folder) if do_TB else None
-
-        # TODO: check what is self. and what may be given just to run (is not needed anywhere else)
 
         # update n_loops to be multiplier of update_size
         if n_loops % update_size != 0:
@@ -140,6 +138,7 @@ class HPMSer:
         self.run_results = self._run(
             n_loops=        n_loops,
             update_size=    update_size,
+            n_devices=      len(devices),
             explore=        explore,
             exploit=        exploit,
             report_N_top=   report_N_top,
@@ -150,6 +149,7 @@ class HPMSer:
             self,
             n_loops,
             update_size,
+            n_devices,
             explore,
             exploit,
             report_N_top,
@@ -159,7 +159,7 @@ class HPMSer:
         points_at_workers: Dict[int, POINT] = {}  # POINTs that are being processed already {sample_num: POINT}
         vpoints_for_update: List[VPoint] = []  # evaluated points stored for next update
 
-        num_free_rw = len(self.devices)
+        num_free_rw = n_devices
 
         # estimator plot (test) elements
         test_points = [VPoint(self.paspa.sample_point()) for _ in range(1000)]
@@ -203,23 +203,32 @@ class HPMSer:
                         val_name=   'est',
                         save_FD=    self.run_folder)
 
-                    if self.tbwr:
-                        self.tbwr.add(self.pcloud.min_nearest, 'hpmser/1.nearest_min', sample_num)
-                        self.tbwr.add(self.pcloud.avg_nearest, 'hpmser/2.nearest_avg', sample_num)
-                        self.tbwr.add(self.pcloud.max_nearest, 'hpmser/3.nearest_max', sample_num)
-                        self.tbwr.add(estimator_loss_all, 'hpmser/4.estimator_loss_all', sample_num)
-                        self.tbwr.add(estimator_loss_new, 'hpmser/5.estimator_loss_new', sample_num)
-                        emin, eavg, emax = mam(test_estimation)
-                        self.tbwr.add(emin, 'hpmser/6.test_estimation_min', sample_num)
-                        self.tbwr.add(eavg, 'hpmser/7.test_estimation_avg', sample_num)
-                        self.tbwr.add(emax, 'hpmser/8.test_estimation_max', sample_num)
-
                     speed = (time.time() - time_update) / update_size
                     time_update = time.time()
                     diff = speed - time_update_mavg.upd(speed)
                     self.logger.info(f'___speed: {speed:.1f}s/task, diff: {"+" if diff >= 0 else "-"}{abs(diff):.1f}s')
 
-                    nfo = f'TOP {report_N_top} vpoints by estimate (estimator: {self.estimator})\n'
+                    if self.tbwr:
+
+                        self.tbwr.add(self.pcloud.min_nearest,  'cloud/1.nearest_min', sample_num)
+                        self.tbwr.add(self.pcloud.avg_nearest,  'cloud/2.nearest_avg', sample_num)
+                        self.tbwr.add(self.pcloud.max_nearest,  'cloud/3.nearest_max', sample_num)
+
+                        vmin, vavg, vmax = mam([vp.value for vp in vpoints_evaluated])
+                        self.tbwr.add(vmin,                     'values/1.val_min', sample_num)
+                        self.tbwr.add(vavg,                     'values/2.val_avg', sample_num)
+                        self.tbwr.add(vmax,                     'values/3.val_max', sample_num)
+
+                        self.tbwr.add(estimator_loss_all,       'estimator/1.loss_all', sample_num)
+                        self.tbwr.add(estimator_loss_new,       'estimator/2.loss_new', sample_num)
+                        emin, eavg, emax = mam(test_estimation)
+                        self.tbwr.add(emin,                     'estimator/3.test_estimation_min', sample_num)
+                        self.tbwr.add(eavg,                     'estimator/4.test_estimation_avg', sample_num)
+                        self.tbwr.add(emax,                     'estimator/5.test_estimation_max', sample_num)
+
+                        self.tbwr.add(speed,                    'process/speed_s/task', sample_num)
+
+                    nfo = f'TOP {report_N_top} VPoints by estimate (estimator: {self.estimator})\n'
                     for vpe in vpoints_estimated[:report_N_top]:
                         nfo += f'{self._vpoint_nfo(*vpe)}\n'
                     self.logger.info(nfo[:-1])
@@ -266,7 +275,7 @@ class HPMSer:
                     min_dist = self.pcloud.avg_nearest * avg_nearest_start_factor
                     while num_estimated_points:
 
-                        points_candidates = [self.paspa.sample_point() for _ in range(n_needed*10*2)] # TODO *2 for error filter
+                        points_candidates = [self.paspa.sample_point() for _ in range(n_needed*10*2)]
                         spcL = [VPoint(point=p) for p in points_candidates]
                         est_vpoints_candidates = self._estimate(vpoints=spcL)
 
@@ -275,15 +284,13 @@ class HPMSer:
 
                         points_candidates = [c[0] for c in ce]
 
-                        # TODO: fiter by error
-
                         n_added, added_ix = self._fill_up(
                             fr=         points_candidates,
                             to=         points_to_evaluate,
                             other=      points_known,
                             num=        num_estimated_points,
                             min_dist=   min_dist)
-                        print(f'/est added {n_added} {added_ix}/{len(points_candidates)}')
+                        self.logger.debug(f'/// est added {n_added} {added_ix}/{len(points_candidates)}')
 
                         num_estimated_points -= n_added
                         min_dist = min_dist * 0.9
@@ -300,16 +307,15 @@ class HPMSer:
                             min_dist=   min_dist)
                         min_dist = min_dist * 0.9
                         n_addedL.append(n_added)
-                    print(f'*randomly added {n_addedL}')
+                    self.logger.debug(f'*** randomly added {n_addedL}')
 
                     random.shuffle(points_to_evaluate)
                     if self.tbwr:
-                        self.tbwr.add(time.time()-s_time, 'hpmser/9.sampling_time', sample_num)
+                        self.tbwr.add(time.time()-s_time, 'process/sampling_time', sample_num)
 
                 ### run tasks with available devices
 
                 while num_free_rw and points_to_evaluate:
-                    self.logger.debug(f'> got {num_free_rw} free RW at {sample_num} sample_num start')
 
                     point = points_to_evaluate.pop(0)
                     task = {
