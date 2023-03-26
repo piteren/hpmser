@@ -2,7 +2,7 @@ import math
 from pypaq.lipytools.pylogger import get_pylogger
 from pypaq.lipytools.stats import mam
 from pypaq.lipytools.plots import three_dim
-from pypaq.pms.base import POINT
+from pypaq.pms.base import POINT, point_str
 from pypaq.pms.paspa import PaSpa
 from typing import Sized, List, Tuple, Optional, Dict, Union
 
@@ -20,8 +20,10 @@ class VPoint:
         self.id = id
         self.value = value
 
+
     def __str__(self):
-        return f'SeRes: id:{self.id}, point:{self.point}, value:{self.value}'
+        id_nfo = f'#{self.id:4}' if self.id is not None else '_'
+        return f'{id_nfo} [val: {self.value:.8f}] {point_str(self.point)}'
 
 
 # cloud of Valued Points
