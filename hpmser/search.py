@@ -293,7 +293,7 @@ class HPMSer:
                             other=      points_known,
                             num=        num_estimated_points,
                             min_dist=   min_dist)
-                        self.logger.debug(f'/// est added {n_added} {added_ix}/{len(points_candidates)}')
+                        self.logger.info(f' /// est added {n_added} {added_ix}/{len(points_candidates)}')
 
                         num_estimated_points -= n_added
                         min_dist = min_dist * 0.9
@@ -310,7 +310,7 @@ class HPMSer:
                             min_dist=   min_dist)
                         min_dist = min_dist * 0.9
                         n_addedL.append(n_added)
-                    self.logger.debug(f'*** randomly added {n_addedL}')
+                    self.logger.info(f' *** randomly added {n_addedL}')
 
                     random.shuffle(points_to_evaluate)
                     if self.tbwr:

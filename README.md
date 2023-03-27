@@ -22,7 +22,7 @@ that uses **HPMSer**.
 ------------
 
 **HPMSer** implements:
-- unique random search with optimized sampling of space
+- smart search with evenly spread out quasi random sampling of space
 - parameters space estimation with regression using SVC RBF
 - space sampling based on current space knowledge (estimation)
 
