@@ -13,18 +13,18 @@ from hpmser.points_cloud import VPoint
 # MSE average loss for Estimator
 def loss(
         model,
-        y_new: NPL,
-        X_new: Optional[NPL]=   None,
+        y_test: NPL,
+        X_test: Optional[NPL]=   None,
         preds: Optional[NPL]=   None,
 ) -> float:
 
-    if X_new is None and preds is None:
-        raise PMSException('\'X_new\' or \'presd\' must be given')
+    if X_test is None and preds is None:
+        raise PMSException('\'X_test\' or \'preds\' must be given')
 
     if preds is None:
-        preds = model.predict(X=X_new)
+        preds = model.predict(X=X_test)
 
-    return sum([(a - b) ** 2 for a, b in zip(preds, y_new)]) / len(y_new)
+    return sum([(a - b) ** 2 for a, b in zip(preds, y_test)]) / len(y_test)
 
 
 class SpaceEstimator(ABC):
@@ -80,7 +80,7 @@ class SpaceEstimator(ABC):
         return 'SpaceEstimator'
 
 
-# SVR RBF based Space Estimator
+# Support Vector Regression (SVR) with Radial Basis Function (RBF) kernel based Space Estimator
 class RBFRegressor(SpaceEstimator):
 
     # C & gamma parameters possible values
@@ -91,110 +91,134 @@ class RBFRegressor(SpaceEstimator):
     def __init__(
             self,
             epsilon: float= 0.01,
-            num_tries: int= 2,  # how many times param with next ix needs to improve to increase ix
+            num_tries: int= 2,  # how many times param with next ix needs to improve to change ix
+            seed=           123,
     ):
 
         self._epsilon = epsilon
         self._num_tries = num_tries
 
         self._indexes =  {'c':0, 'g':0}
-        self._improved = {'c':0, 'g':0}
+        self._improved = {
+            'cH': 0, # c higher
+            'cL': 0, # c lower
+            'gH': 0, # g higher
+            'gL': 0} # g lower
 
-        self._model = self._build_model()
+        self._model = None
 
         self.data_X: Optional[NPL] = None
         self.data_y: Optional[NPL] = None
-        self._fitted: bool = False
+
+        np.random.seed(seed)
 
     # builds SVR RBF model from given indexes of parameters
     def _build_model(self, cix:Optional[int]=None, gix:Optional[int]=None) -> SVR:
         if cix is None: cix = self._indexes['c']
         if gix is None: gix = self._indexes['g']
         return SVR(
-            kernel=     "rbf",
+            kernel=     "rbf",                      # Radial Basis Function kernel
             C=          RBFRegressor.VAL['c'][cix], # regularization, controls error with margin, lower C -> larger margin, more support vectors, longer fitting time
             gamma=      RBFRegressor.VAL['g'][gix], # controls shape of decision boundary, larger value for more complex
             epsilon=    self._epsilon)              # threshold for what is considered an acceptable error rate in the training data
 
-    # adds given data, then fits model
-    def _fit(self, X_new:Optional[NPL]=None, y_new:Optional[NPL]=None) -> None:
-
-        if X_new is not None:
-
-            # convert if needed
-            if type(X_new) is not np.ndarray: X_new = np.asarray(X_new)
-            if type(y_new) is not np.ndarray: y_new = np.asarray(y_new)
-
-            # append
-            self.data_X = np.concatenate([self.data_X, X_new]) if self.data_X is not None else X_new
-            self.data_y = np.concatenate([self.data_y, y_new]) if self.data_y is not None else y_new
-
-        self._model.fit(X=self.data_X, y=self.data_y)
-        self._fitted = True
+    # fits model, returns test loss
+    @staticmethod
+    def _fit(
+            model,
+            X_train: NPL,
+            y_train: NPL,
+            X_test: NPL,
+            y_test: NPL,
+    ) -> float:
+        model.fit(X=X_train, y=y_train)
+        return loss(model=model, X_test=X_test, y_test=y_test)
 
     # tries to update model params, adds data, then fits, returns loss of new model for given data
     def update(self, X_new:NPL, y_new:NPL) -> float:
 
-        if self._fitted:
-
-            loss_current = loss(model=self._model, X_new=X_new, y_new=y_new)
-
-            new_indexes = {
-                'c': self._indexes['c'] + 1,
-                'g': self._indexes['g'] + 1}
-
-            loss_updated = {}
-            for k in new_indexes:
-
-                # no possible update for k
-                if new_indexes[k] == len(RBFRegressor.VAL[k]):
-                    loss_updated[k] = loss_current
-
-                # check model with k updated
-                else:
-                    params = {f'{p}ix': self._indexes[p] for p in self._indexes}
-                    params[f'{k}ix'] = new_indexes[k]
-                    model = self._build_model(**params)
-                    model.fit(X=self.data_X, y=self.data_y)
-                    loss_updated[k] = loss(model=model, X_new=X_new, y_new=y_new)
-
-            # increase OR reset
-            for k in loss_updated:
-                if loss_updated[k] < loss_current: self._improved[k] += 1
-                else:                              self._improved[k] = 0
-
-            # search for k to update, priority for lower
-            update_k = None
-            loss_updated_sorted = sorted([(k,l) for k,l in loss_updated.items()], key=lambda x:x[1])
-            for e in loss_updated_sorted:
-                k = e[0]
-                if self._improved[k] == self._num_tries:
-                    update_k = k
-                    break
-
-            # update & build new model, reset counters
-            if update_k is not None:
-                self._indexes[update_k] += 1
-                self._model = self._build_model()
-                self._improved = {k:0 for k in self._improved} # reset
-
-        # fit model on concatenated data
+        # add new data
         self.data_X = np.concatenate([self.data_X, X_new]) if self.data_X is not None else X_new
         self.data_y = np.concatenate([self.data_y, y_new]) if self.data_y is not None else y_new
 
-        self._fit()
+        ### prepare data split
 
-        return loss(model=self._model, X_new=X_new, y_new=y_new)
+        data_size = len(self.data_X)
+        train_size = data_size // 2 # TODO <- parametrize?
+        choice = np.random.choice(range(data_size), size=train_size, replace=False)
+        tr_sel = np.zeros(data_size, dtype=bool)
+        tr_sel[choice] = True
+        ts_sel = ~tr_sel
+
+        X_train = self.data_X[tr_sel]
+        y_train = self.data_y[tr_sel]
+        X_test = self.data_X[ts_sel]
+        y_test = self.data_y[ts_sel]
+
+        m_configs = {
+            'current': {'cix': self._indexes['c'],   'gix': self._indexes['g']},   # current
+            'cH':      {'cix': self._indexes['c']+1, 'gix': self._indexes['g']},   # c higher
+            'cL':      {'cix': self._indexes['c']-1, 'gix': self._indexes['g']},   # c lower
+            'gH':      {'cix': self._indexes['c'],   'gix': self._indexes['g']+1}, # g higher
+            'gL':      {'cix': self._indexes['c'],   'gix': self._indexes['g']-1}} # g lower
+
+        # filter out not valid
+        not_valid = []
+        for k in m_configs:
+            for p in m_configs[k]:
+                if m_configs[k][p] in [-1,len(RBFRegressor.VAL[p[0]])]:
+                    not_valid.append(k)
+        not_valid = list(set(not_valid))
+        for k in not_valid:
+            m_configs.pop(k)
+
+        models = {config: self._build_model(**m_configs[config]) for config in m_configs}
+
+        losses = {config: RBFRegressor._fit(
+            model=      models[config],
+            X_train=    X_train,
+            y_train=    y_train,
+            X_test=     X_test,
+            y_test=     y_test) for config in models}
+
+        loss_current = losses.pop('current')
+
+        for k in losses:
+            if losses[k] < loss_current: self._improved[k] += 1
+            else:                        self._improved[k] = 0
+
+        # search for k to update, priority for lower
+        update_k = None
+        losses_sorted = sorted([(k,l) for k,l in losses.items()], key=lambda x:x[1])
+        for e in losses_sorted:
+            k = e[0]
+            if self._improved[k] == self._num_tries:
+                update_k = k
+                break
+
+        if update_k is not None:
+            self._indexes[update_k[0]] += 1 if update_k[1] == 'H' else -1
+            self._model = models[update_k]
+        else:
+            self._model = models['current']
+
+        # finally fit with all data
+        return RBFRegressor._fit(
+            model=      self._model,
+            X_train=    self.data_X,
+            y_train=    self.data_y,
+            X_test=     self.data_X,
+            y_test=     self.data_y)
 
 
     def predict(self, x:NPL) -> np.ndarray:
-        if not self._fitted:
+        if not self.fitted:
             raise Exception('RBFRegressor needs to be fitted before predict')
         return self._model.predict(X=x)
 
     @property
     def fitted(self) -> bool:
-        return self._fitted
+        return self._model is not None
 
     # returns object state
     @property

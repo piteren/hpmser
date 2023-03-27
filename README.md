@@ -23,7 +23,7 @@ that uses **HPMSer**.
 
 **HPMSer** implements:
 - smart search with evenly spread out quasi random sampling of space
-- parameters space estimation with regression using SVC RBF
+- parameters space estimation with regression using SVC RBF (Support Vector Regression with Radial Basis Function kernel)
 - space sampling based on current space knowledge (estimation)
 
 **HPMSer** features:

@@ -18,7 +18,7 @@ class TestRBFRegressor(unittest.TestCase):
         rng = 10
 
         n_add = 20
-        n_loops = 20
+        n_loops = 50
 
         rr = RBFRegressor()
 

@@ -213,23 +213,33 @@ class HPMSer:
 
                     if self.tbwr:
 
-                        self.tbwr.add(self.pcloud.min_nearest,  'cloud/1.nearest_min', sample_num)
-                        self.tbwr.add(self.pcloud.avg_nearest,  'cloud/2.nearest_avg', sample_num)
-                        self.tbwr.add(self.pcloud.max_nearest,  'cloud/3.nearest_max', sample_num)
+                        values = [vp.value for vp in vpoints_evaluated]
+                        vmin, vavg, vmax = mam(values)
+                        self.tbwr.add(vmin,                     'cloud/1.value_min',        sample_num)
+                        self.tbwr.add(vavg,                     'cloud/2.value_avg',        sample_num)
+                        self.tbwr.add(vmax,                     'cloud/3.value_max',        sample_num)
+                        self.tbwr.add_histogram(values,         'values',                   sample_num)
 
-                        vmin, vavg, vmax = mam([vp.value for vp in vpoints_evaluated])
-                        self.tbwr.add(vmin,                     'values/1.val_min', sample_num)
-                        self.tbwr.add(vavg,                     'values/2.val_avg', sample_num)
-                        self.tbwr.add(vmax,                     'values/3.val_max', sample_num)
+                        self.tbwr.add(self.pcloud.min_nearest,  'cloud/4.nearest_dst_min',  sample_num)
+                        self.tbwr.add(self.pcloud.avg_nearest,  'cloud/5.nearest_dst_avg',  sample_num)
+                        self.tbwr.add(self.pcloud.max_nearest,  'cloud/6.nearest_dst_max',  sample_num)
 
-                        self.tbwr.add(estimator_loss_all,       'estimator/1.loss_all', sample_num)
-                        self.tbwr.add(estimator_loss_new,       'estimator/2.loss_new', sample_num)
+                        emin, eavg, emax = mam(estimation)
+                        self.tbwr.add(emin,                     'estimator/1.estimation_min',       sample_num)
+                        self.tbwr.add(eavg,                     'estimator/2.estimation_avg',       sample_num)
+                        self.tbwr.add(emax,                     'estimator/3.estimation_max',       sample_num)
+                        self.tbwr.add_histogram(estimation,     'estimation',                       sample_num)
+
                         emin, eavg, emax = mam(test_estimation)
-                        self.tbwr.add(emin,                     'estimator/3.test_estimation_min', sample_num)
-                        self.tbwr.add(eavg,                     'estimator/4.test_estimation_avg', sample_num)
-                        self.tbwr.add(emax,                     'estimator/5.test_estimation_max', sample_num)
+                        self.tbwr.add(emin,                     'estimator/4.test_estimation_min',  sample_num)
+                        self.tbwr.add(eavg,                     'estimator/5.test_estimation_avg',  sample_num)
+                        self.tbwr.add(emax,                     'estimator/6.test_estimation_max',  sample_num)
+                        self.tbwr.add_histogram(test_estimation,'test_estimation',                  sample_num)
 
-                        self.tbwr.add(speed,                    'process/speed_s/task', sample_num)
+                        self.tbwr.add(estimator_loss_all,       'estimator/7.loss_all',             sample_num)
+                        self.tbwr.add(estimator_loss_new,       'estimator/8.loss_new',             sample_num)
+
+                        self.tbwr.add(speed, 'process/speed_s/task', sample_num)
 
                     nfo = f'TOP {report_N_top} VPoints by estimate (estimator: {self.estimator})\n'
                     for vpe in vpoints_estimated[:report_N_top]:
