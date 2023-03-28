@@ -94,6 +94,11 @@ class HPMSer:
 
         cont_nfo = ', continuing' if name_cont else ''
         self.logger.info(f'*** hpmser : {self.name} *** started for: {func.__name__}{cont_nfo}')
+        self.logger.info(f'> func_const:  {self.func_const}')
+        self.logger.info(f'> n_loops:     {n_loops}')
+        self.logger.info(f'> update_size: {update_size}')
+        self.logger.info(f'> explore:     {explore}')
+        self.logger.info(f'> exploit:     {exploit}')
 
         paspa_logger = get_child(logger=self.logger, name='paspa', change_level=10)
         self.paspa = PaSpa(psdd=self.func_psdd, logger=paspa_logger)
