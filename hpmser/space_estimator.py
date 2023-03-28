@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 import numpy as np
-from pypaq.pytypes import NPL
+from pypaq.pytypes import NPL, NUM
 from pypaq.pms.base import PMSException
 from pypaq.pms.paspa import PaSpa
 from sklearn.svm import SVR
@@ -10,26 +10,13 @@ from hpmser.points_cloud import VPoint
 
 
 
-# MSE average loss for Estimator
-def loss(
-        model,
-        y_test: NPL,
-        X_test: Optional[NPL]=   None,
-        preds: Optional[NPL]=   None,
-) -> float:
-
-    if X_test is None and preds is None:
-        raise PMSException('\'X_test\' or \'preds\' must be given')
-
-    if preds is None:
-        preds = model.predict(X=X_test)
-
-    return sum([(a - b) ** 2 for a, b in zip(preds, y_test)]) / len(y_test)
-
 
 class SpaceEstimator(ABC):
 
-    # extracts X & y from vpoints ands space
+    def __init__(self, logger):
+        self.logger = logger
+
+    # extracts X & y from vpoints & space
     @staticmethod
     def _extract_Xy(vpoints:List[VPoint], space:PaSpa) -> Tuple[np.ndarray, np.ndarray]:
 
@@ -42,12 +29,12 @@ class SpaceEstimator(ABC):
 
         return np.asarray(points_feats), np.asarray(scores)
 
-    # updates model with given data, returns loss of new model for given data
-    def update(self, X_new:NPL, y_new:NPL) -> float:
+    # updates model with given data, returns dict with update info
+    def update(self, X_new:NPL, y_new:NPL) -> Dict[str,NUM]:
         pass
 
-
-    def update_vpoints(self, vpoints:List[VPoint], space:PaSpa) -> float:
+    # updates model with given VPoints, returns dict with update info
+    def update_vpoints(self, vpoints:List[VPoint], space:PaSpa) -> Dict[str,NUM]:
         X, y = SpaceEstimator._extract_Xy(vpoints, space)
         return self.update(X, y)
 
@@ -59,6 +46,36 @@ class SpaceEstimator(ABC):
     def predict_vpoints(self, vpoints:List[VPoint], space:PaSpa) -> np.ndarray:
         X, y = SpaceEstimator._extract_Xy(vpoints, space)
         return self.predict(X)
+
+    # MSE average weighted loss
+    @staticmethod
+    def loss(
+            model,
+            y_test: NPL,
+            X_test: Optional[NPL]=  None,
+            preds: Optional[NPL]=   None,
+            weights: Optional[NPL]= None,
+    ) -> float:
+
+        if X_test is None and preds is None:
+            raise PMSException('\'X_test\' or \'preds\' must be given')
+
+        if preds is None:
+            preds = model.predict(X=X_test)
+
+        if type(preds) is not np.ndarray:
+            preds = np.asarray(preds)
+        if type(y_test) is not np.ndarray:
+            y_test = np.asarray(y_test)
+
+        l = (preds - y_test) ** 2
+
+        if weights is not None:
+            if type(weights) is not np.ndarray:
+                weights = np.asarray(weights)
+            l *= weights
+
+        return float(np.mean(l))
 
     # Estimator status
     @property
@@ -72,7 +89,7 @@ class SpaceEstimator(ABC):
 
     @classmethod
     @abstractmethod
-    def from_state(cls, state:Dict):
+    def from_state(cls, state:Dict, logger):
         pass
 
 
@@ -90,25 +107,27 @@ class RBFRegressor(SpaceEstimator):
 
     def __init__(
             self,
-            epsilon: float= 0.01,
-            num_tries: int= 2,  # how many times param with next ix needs to improve to change ix
-            seed=           123,
+            epsilon: float=     0.01,
+            num_tests: int=     9,      # number of cross-validation tests while updating
+            test_size: float=   0.25,   # size of test data (factor of all)
+            y_cut_off: float=   0.1,    # value of y with lower loss (for sparse y)
+            seed=               123,
+            **kwargs,
     ):
 
-        self._epsilon = epsilon
-        self._num_tries = num_tries
+        SpaceEstimator.__init__(self, **kwargs)
 
         self._indexes =  {'c':0, 'g':0}
-        self._improved = {
-            'cH': 0, # c higher
-            'cL': 0, # c lower
-            'gH': 0, # g higher
-            'gL': 0} # g lower
+        self._epsilon = epsilon
 
         self._model = None
 
         self.data_X: Optional[NPL] = None
         self.data_y: Optional[NPL] = None
+
+        self._num_tests = num_tests
+        self._test_size = test_size
+        self._y_cut_off = y_cut_off
 
         np.random.seed(seed)
 
@@ -130,39 +149,45 @@ class RBFRegressor(SpaceEstimator):
             y_train: NPL,
             X_test: NPL,
             y_test: NPL,
+            weights: Optional[NPL]= None,
     ) -> float:
         model.fit(X=X_train, y=y_train)
-        return loss(model=model, X_test=X_test, y_test=y_test)
+        return RBFRegressor.loss(model=model, X_test=X_test, y_test=y_test, weights=weights)
 
-    # tries to update model params, adds data, then fits, returns loss of new model for given data
-    def update(self, X_new:NPL, y_new:NPL) -> float:
+    # prepares weights for y
+    def _weights(self, y:NPL) -> np.ndarray:
+        y_min = np.min(y)
+        y_max = np.max(y)
+        y_cut = y_min + (y_max - y_min) * self._y_cut_off
+        factor = 1 - np.mean((y <= y_cut).astype(int))
+        factor = max(0.1, factor)
+        return np.where(y > y_cut, 1, factor)
+
+    # concatenates data, tries to update model params, fits & returns some info
+    def update(self, X_new:NPL, y_new:NPL) -> Dict[str,NUM]:
+
+        self.logger.info(f'preparing for update with {self._num_tests}X cross-validation')
+
+        loss_on_new = 0
+        if self.fitted:
+            loss_on_new = self.loss(
+                model=  self._model,
+                X_test= X_new,
+                y_test= y_new)
 
         # add new data
         self.data_X = np.concatenate([self.data_X, X_new]) if self.data_X is not None else X_new
         self.data_y = np.concatenate([self.data_y, y_new]) if self.data_y is not None else y_new
 
-        ### prepare data split
-
-        data_size = len(self.data_X)
-        train_size = data_size // 2 # TODO <- parametrize?
-        choice = np.random.choice(range(data_size), size=train_size, replace=False)
-        tr_sel = np.zeros(data_size, dtype=bool)
-        tr_sel[choice] = True
-        ts_sel = ~tr_sel
-
-        X_train = self.data_X[tr_sel]
-        y_train = self.data_y[tr_sel]
-        X_test = self.data_X[ts_sel]
-        y_test = self.data_y[ts_sel]
+        ### prepare valid future configs
 
         m_configs = {
-            'current': {'cix': self._indexes['c'],   'gix': self._indexes['g']},   # current
-            'cH':      {'cix': self._indexes['c']+1, 'gix': self._indexes['g']},   # c higher
-            'cL':      {'cix': self._indexes['c']-1, 'gix': self._indexes['g']},   # c lower
-            'gH':      {'cix': self._indexes['c'],   'gix': self._indexes['g']+1}, # g higher
-            'gL':      {'cix': self._indexes['c'],   'gix': self._indexes['g']-1}} # g lower
+            'current':  {'cix': self._indexes['c'],     'gix': self._indexes['g']},     # current
+            'cH':       {'cix': self._indexes['c'] + 1, 'gix': self._indexes['g']},     # c higher
+            'cL':       {'cix': self._indexes['c'] - 1, 'gix': self._indexes['g']},     # c lower
+            'gH':       {'cix': self._indexes['c'],     'gix': self._indexes['g'] + 1}, # g higher
+            'gL':       {'cix': self._indexes['c'],     'gix': self._indexes['g'] - 1}} # g lower
 
-        # filter out not valid
         not_valid = []
         for k in m_configs:
             for p in m_configs[k]:
@@ -171,30 +196,52 @@ class RBFRegressor(SpaceEstimator):
         not_valid = list(set(not_valid))
         for k in not_valid:
             m_configs.pop(k)
+        self.logger.info(f'valid alternative models configs for update: {m_configs}')
 
         models = {config: self._build_model(**m_configs[config]) for config in m_configs}
 
-        losses = {config: RBFRegressor._fit(
-            model=      models[config],
-            X_train=    X_train,
-            y_train=    y_train,
-            X_test=     X_test,
-            y_test=     y_test) for config in models}
+        acc_loss = {k: 0 for k in m_configs}
+        for t_ix in range(self._num_tests):
 
-        loss_current = losses.pop('current')
+            ### prepare data split
 
-        for k in losses:
-            if losses[k] < loss_current: self._improved[k] += 1
-            else:                        self._improved[k] = 0
+            data_size = len(self.data_X)
+            train_size = int(data_size * (1-self._test_size))
+            choice = np.random.choice(range(data_size), size=train_size, replace=False)
+            tr_sel = np.zeros(data_size, dtype=bool)
+            tr_sel[choice] = True
+            ts_sel = ~tr_sel
+
+            X_train = self.data_X[tr_sel]
+            y_train = self.data_y[tr_sel]
+            X_test = self.data_X[ts_sel]
+            y_test = self.data_y[ts_sel]
+
+            losses = {config: RBFRegressor._fit(
+                model=      models[config],
+                X_train=    X_train,
+                y_train=    y_train,
+                X_test=     X_test,
+                y_test=     y_test,
+                weights=    self._weights(y=y_test)) for config in models}
+
+            for k in losses:
+                acc_loss[k] += losses[k]
+
+        for k in acc_loss:
+            acc_loss[k] /= self._num_tests
+        self.logger.info(f'loss achieved with each config: {acc_loss}')
+
+        acc_loss_current = acc_loss.pop('current')
 
         # search for k to update, priority for lower
         update_k = None
-        losses_sorted = sorted([(k,l) for k,l in losses.items()], key=lambda x:x[1])
+        losses_sorted = sorted([(k,l) for k,l in acc_loss.items()], key=lambda x:x[1])
         for e in losses_sorted:
-            k = e[0]
-            if self._improved[k] == self._num_tries:
-                update_k = k
+            if e[1] < acc_loss_current:
+                update_k = e[0]
                 break
+        self.logger.info(f'RBFRegressor is updating: {update_k}')
 
         if update_k is not None:
             self._indexes[update_k[0]] += 1 if update_k[1] == 'H' else -1
@@ -202,18 +249,29 @@ class RBFRegressor(SpaceEstimator):
         else:
             self._model = models['current']
 
+        self.logger.info(f' > current config of indexes: {self._indexes}')
+
         # finally fit with all data
-        return RBFRegressor._fit(
+        loss_all_data_weighted = RBFRegressor._fit(
             model=      self._model,
             X_train=    self.data_X,
             y_train=    self.data_y,
             X_test=     self.data_X,
-            y_test=     self.data_y)
+            y_test=     self.data_y,
+            weights=    self._weights(y=self.data_y))
+
+        return {
+            'loss_on_new':              loss_on_new,
+            'loss_all_data_weighted':   loss_all_data_weighted,
+            'c_ix':                     self._indexes['c'],
+            'g_ix':                     self._indexes['g']}
 
 
     def predict(self, x:NPL) -> np.ndarray:
         if not self.fitted:
-            raise Exception('RBFRegressor needs to be fitted before predict')
+            msg = 'RBFRegressor needs to be fitted before predict'
+            self.logger.error(msg)
+            raise Exception(msg)
         return self._model.predict(X=x)
 
     @property
@@ -226,15 +284,21 @@ class RBFRegressor(SpaceEstimator):
         return {
             'indexes':      self._indexes,
             'epsilon':      self._epsilon,
-            'num_tries':    self._num_tries,
-            'improved':     self._improved}
+            'num_tests':    self._num_tests,
+            'test_size':    self._test_size,
+            'y_cut_off':    self._y_cut_off}
 
     # builds object from a state
     @classmethod
-    def from_state(cls, state:Dict):
-        reg = cls(epsilon=state['epsilon'], num_tries=state['num_tries'])
+    def from_state(cls, state:Dict, logger):
+        reg = cls(
+            epsilon=    state['epsilon'],
+            num_tests=  state['num_tests'],
+            test_size=  state['test_size'],
+            y_cut_off=  state['y_cut_off'],
+            logger=     logger)
         reg._indexes = state['indexes']
-        reg._improved = state['improved']
+        logger.info(f'RBFRegressor build from state: {state}')
         return reg
 
     def __str__(self):

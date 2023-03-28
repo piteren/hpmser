@@ -20,7 +20,7 @@ from typing import Callable, Optional, List, Dict, Tuple
 
 from hpmser.running_worker import HRW
 from hpmser.points_cloud import PointsCloud, VPoint
-from hpmser.space_estimator import SpaceEstimator, RBFRegressor, loss
+from hpmser.space_estimator import SpaceEstimator, RBFRegressor
 
 
 
@@ -106,7 +106,7 @@ class HPMSer:
             self.pcloud, self.estimator = self._load()
         else:
             self.pcloud = PointsCloud(paspa=self.paspa, logger=self.logger)
-            self.estimator = estimator_type()
+            self.estimator = estimator_type(logger=get_child(logger=self.logger, name='estimator', change_level=10))
 
         devices = get_devices(devices=devices, torch_namespace=False) # manage devices
         self.logger.info(f'> hpmser resolved given devices ({len(devices)}): {devices}')
@@ -191,10 +191,11 @@ class HPMSer:
                         axes=   plot_axes,
                         folder= self.run_folder)
 
-                    estimator_loss_new = self.estimator.update_vpoints(vpoints=vpoints_for_update, space=self.paspa)
+                    es_time = time.time()
+                    ed = self.estimator.update_vpoints(vpoints=vpoints_for_update, space=self.paspa)
+                    es_time = time.time() - es_time
                     estimation = self._estimate(vpoints=vpoints_evaluated)
                     vpoints_estimated = sorted(zip(vpoints_evaluated, estimation), key=lambda x:x[1], reverse=True)
-                    estimator_loss_all = loss(model=self.estimator, y_new=[sp.value for sp in vpoints_evaluated], preds=estimation)
 
                     test_estimation = self._estimate(vpoints=test_points)
                     three_dim(
@@ -213,7 +214,7 @@ class HPMSer:
 
                     if self.tbwr:
 
-                        values = [vp.value for vp in vpoints_evaluated]
+                        values = np.asarray([vp.value for vp in vpoints_evaluated])
                         vmin, vavg, vmax = mam(values)
                         self.tbwr.add(vmin,                     'cloud/1.value_min',        sample_num)
                         self.tbwr.add(vavg,                     'cloud/2.value_avg',        sample_num)
@@ -236,10 +237,11 @@ class HPMSer:
                         self.tbwr.add(emax,                     'estimator/6.test_estimation_max',  sample_num)
                         self.tbwr.add_histogram(test_estimation,'test_estimation',                  sample_num)
 
-                        self.tbwr.add(estimator_loss_all,       'estimator/7.loss_all',             sample_num)
-                        self.tbwr.add(estimator_loss_new,       'estimator/8.loss_new',             sample_num)
+                        for ix,k in enumerate(ed.keys()):
+                            self.tbwr.add(ed[k],               f'estimator/{ix+7}.{k}',             sample_num)
 
-                        self.tbwr.add(speed, 'process/speed_s/task', sample_num)
+                        self.tbwr.add(es_time,  'process/estimator_upd_sec',    sample_num)
+                        self.tbwr.add(speed,    'process/speed_s/task',         sample_num)
 
                     nfo = f'TOP {report_N_top} VPoints by estimate (estimator: {self.estimator})\n'
                     for vpe in vpoints_estimated[:report_N_top]:
@@ -248,6 +250,7 @@ class HPMSer:
 
                     # check for main loop break condition
                     if len(vpoints_evaluated) >= n_loops:
+                        self.logger.info(f'{self.name} all loops done!')
                         break_loop = True
 
                     vpoints_for_update = []
@@ -361,23 +364,29 @@ class HPMSer:
 
         except KeyboardInterrupt:
             self.logger.warning(' > hpmser_GX KeyboardInterrupt-ed..')
-            raise KeyboardInterrupt # raise exception for OMPRunner
-        
-        finally:
 
-            self._save()
-            self.ompr.exit()
+        self._save()
+        self.ompr.exit()
 
-            vpoints_evaluated = self.pcloud.vpoints
-            estimation = self._estimate(vpoints=vpoints_evaluated)
-            if estimation is None:
-                estimation = [None]*len(vpoints_evaluated)
-            vpoints_estimated = sorted(zip(vpoints_evaluated, estimation), key=lambda x: x[1], reverse=True)
+        vpoints_evaluated = self.pcloud.vpoints
+        estimation = self._estimate(vpoints=vpoints_evaluated)
+        if estimation is None:
+            estimation = [None]*len(vpoints_evaluated)
+        vpoints_estimated = sorted(zip(vpoints_evaluated, estimation), key=lambda x: x[1], reverse=True)
 
-            self.logger.info(f'hpmser {self.name} finished, exits.')
+        report_nfo = f'TOP {report_N_top} VPoints and their 20 closest neighbours:\n'
+        top5 = vpoints_estimated[:report_N_top]
+        for ix, (vp, e) in enumerate(top5):
+            report_nfo += f'\n({ix}) {self._vpoint_nfo(vpoint=vp, estimation=e)}\n'
+            vpd = sorted([(_vp, e, self.paspa.distance(vp.point, _vp.point)) for _vp, e in vpoints_estimated], key=lambda x: x[-1])
+            for i in range(20):
+                _vp, _e, d = vpd[i]
+                report_nfo +=f'> dst:{d:.4f} {self._vpoint_nfo(vpoint=_vp, estimation=_e)}\n'
+        self.logger.info(report_nfo)
 
-            return vpoints_estimated
+        self.logger.info(f'hpmser {self.name} finished, exits..')
 
+        return vpoints_estimated
 
     # prepares estimation for Valued Points
     def _estimate(self, vpoints:List[VPoint]) -> Optional[np.ndarray]:
@@ -469,7 +478,9 @@ class HPMSer:
             paspa=  self.paspa,
             logger= self.logger)
 
-        estimator = data['estimator_type'].from_state(state=data['estimator_state'])
+        estimator = data['estimator_type'].from_state(
+            state=  data['estimator_state'],
+            logger= get_child(logger=self.logger, name='estimator', change_level=10))
 
         # update objects 'states'
         if data['vpoints']:
