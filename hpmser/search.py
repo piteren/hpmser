@@ -296,13 +296,22 @@ class HPMSer:
                     min_dist = self.pcloud.avg_nearest * avg_nearest_start_factor
                     while num_estimated_points:
 
-                        points_candidates = [self.paspa.sample_point() for _ in range(n_needed*10*2)]
-                        spcL = [VPoint(point=p) for p in points_candidates]
-                        est_vpoints_candidates = self._estimate(vpoints=spcL)
+                        nc_multiplier = double_hinge(
+                            sf=explore, ef=exploit, counter=sample_num, max_count=n_loops,
+                            s_val=  10,
+                            e_val=  50)
+
+                        points_candidates = [self.paspa.sample_point() for _ in range(int(n_needed * nc_multiplier))]
+                        vpcL = [VPoint(point=p) for p in points_candidates]
+                        est_vpoints_candidates = self._estimate(vpoints=vpcL)
+
+                        upper_factor = double_hinge(
+                            sf=explore, ef=exploit, counter=sample_num, max_count=n_loops,
+                            s_val=  0.5,
+                            e_val=  0.1)
 
                         ce = sorted(zip(points_candidates, est_vpoints_candidates), key=lambda x: x[1], reverse=True)
-                        ce = ce[:len(points_candidates) // 2]  # half highest estimate
-
+                        ce = ce[:int(len(points_candidates)*upper_factor)] # upper part of upper_factor size
                         points_candidates = [c[0] for c in ce]
 
                         n_added, added_ix = self._fill_up(
@@ -311,7 +320,7 @@ class HPMSer:
                             other=      points_known,
                             num=        num_estimated_points,
                             min_dist=   min_dist)
-                        self.logger.info(f' /// est added {n_added} {added_ix}/{len(points_candidates)}')
+                        self.logger.info(f' /// estimate sampled: {n_added} {added_ix}/{len(points_candidates)}')
 
                         num_estimated_points -= n_added
                         min_dist = min_dist * 0.9
@@ -328,7 +337,7 @@ class HPMSer:
                             min_dist=   min_dist)
                         min_dist = min_dist * 0.9
                         n_addedL.append(n_added)
-                    self.logger.info(f' *** randomly added {n_addedL}')
+                    if n_addedL: self.logger.info(f' *** q-random sampled: {n_addedL}')
 
                     random.shuffle(points_to_evaluate)
                     if self.tbwr:
@@ -365,7 +374,7 @@ class HPMSer:
                     time_taken = time.time() - msg_s_time
                     estimation = self._estimate(vpoints=[vpoint])
                     if estimation is not None: estimation = estimation[0]
-                    self.logger.info(f'{self._vpoint_nfo(vpoint=vpoint, estimation=estimation)} ({time_taken:.1f}s)')
+                    self.logger.info(f'{self._vpoint_nfo(vpoint=vpoint, estimation=estimation)} {time_taken:.1f}s')
 
         except KeyboardInterrupt:
             self.logger.warning(' > hpmser_GX KeyboardInterrupt-ed..')
@@ -379,14 +388,17 @@ class HPMSer:
             estimation = [None]*len(vpoints_evaluated)
         vpoints_estimated = sorted(zip(vpoints_evaluated, estimation), key=lambda x: x[1], reverse=True)
 
-        report_nfo = f'TOP {report_N_top} VPoints and their 20 closest neighbours:\n'
-        top5 = vpoints_estimated[:report_N_top]
-        for ix, (vp, e) in enumerate(top5):
+        n_neighbours = 20 if len(vpoints_estimated) > 20 else len(vpoints_estimated)-1
+        report_nfo = f'\nTOP {report_N_top} VPoints and their {n_neighbours} closest neighbours:\n'
+        topN = vpoints_estimated[:report_N_top]
+        topN_ids = [vp.id for vp,_ in topN]
+        for ix, (vp, e) in enumerate(topN):
             report_nfo += f'\n({ix}) {self._vpoint_nfo(vpoint=vp, estimation=e)}\n'
             vpd = sorted([(_vp, e, self.paspa.distance(vp.point, _vp.point)) for _vp, e in vpoints_estimated], key=lambda x: x[-1])
-            for i in range(20):
-                _vp, _e, d = vpd[i]
-                report_nfo +=f'> dst:{d:.4f} {self._vpoint_nfo(vpoint=_vp, estimation=_e)}\n'
+            for i in range(n_neighbours):
+                _vp, _e, d = vpd[i+1]
+                aster_nfo = '*' if _vp.id in topN_ids else ' '
+                report_nfo +=f'> dst:{d:.4f} {aster_nfo}{self._vpoint_nfo(vpoint=_vp, estimation=_e)}\n'
         self.logger.info(report_nfo)
 
         self.logger.info(f'hpmser {self.name} finished, exits..')
