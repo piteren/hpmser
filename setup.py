@@ -9,7 +9,7 @@ def get_requirements():
 
 setup(
     name=               'hpmser',
-    version=            'v2.0.0',
+    version=            'v2.1.0',
     url=                'https://github.com/piteren/hpmser.git',
     author=             'Piotr Niewinski',
     author_email=       'pioniewinski@gmail.com',
