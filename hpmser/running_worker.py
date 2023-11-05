@@ -1,5 +1,5 @@
 from ompr.runner import RunningWorker
-from pypaq.mpython.devices import DevicesPypaq
+from torchness.devices import DevicesTorchness
 from pypaq.pms.base import POINT, get_params
 from typing import Callable, Optional, Any
 
@@ -12,7 +12,8 @@ class HRW(RunningWorker):
             self,
             func: Callable,
             func_const: Optional[POINT],
-            device: DevicesPypaq= None):
+            device: DevicesTorchness=   None,
+    ):
 
         self.func = func
         self.func_const = func_const if func_const else {}

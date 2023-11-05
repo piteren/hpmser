@@ -8,18 +8,18 @@ from pypaq.lipytools.pylogger import get_pylogger, get_child
 from pypaq.lipytools.plots import three_dim
 from pypaq.lipytools.double_hinge import double_hinge
 from pypaq.lipytools.stats import mam
-from pypaq.mpython.devices import DevicesPypaq, get_devices
 from pypaq.pms.paspa import PaSpa
 from pypaq.pms.base import PSDD, POINT, point_str
+from pypaq.pms.points_cloud import PointsCloud, VPoint
 import random
 import select
 import sys
 import time
 from torchness.tbwr import TBwr
+from torchness.devices import DevicesTorchness, get_devices
 from typing import Callable, Optional, List, Dict, Tuple
 
 from hpmser.running_worker import HRW
-from hpmser.points_cloud import PointsCloud, VPoint
 from hpmser.space_estimator import SpaceEstimator, RBFRegressor
 
 
@@ -36,7 +36,7 @@ class HPMSer:
             func: Callable,                                     # function which parameters need to be optimized
             func_psdd: PSDD,                                    # function parameters space definition dict (PSDD), from here points {param: arg} will be sampled
             func_const: Optional[POINT]=            None,       # func constant kwargs, will be updated with sample (point) taken from PaSpa
-            devices: DevicesPypaq=                  None,       # devices to use for search, check pypaq.mpython.devices
+            devices: DevicesTorchness=              None,       # devices to use for search, check pypaq.mpython.devices
             n_loops: int=                           500,        # number of search loops, should be multiplier of update_estimator_loops
             update_size=                            20,         # frequency of estimator & pcloud update
             explore: float=                         0.2,        # factor of loops (from the beginning) with 100% random exploration of space

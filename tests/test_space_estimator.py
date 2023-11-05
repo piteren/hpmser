@@ -28,7 +28,7 @@ class TestRBFRegressor(unittest.TestCase):
             new_points = rng * np.random.rand(n_add, 2) - rng / 2
             vals_new_points = func(new_points)
 
-            l = rr.update(X_new=new_points, y_new=vals_new_points)
-            print(f'{loop:2} {l:.4f} {rr}')
+            nfo = rr.update(X_new=new_points, y_new=vals_new_points)
+            print(f'{loop:2} {nfo} {rr}')
 
         print(f'time taken: {time.time() - s_time:.1f}s')

@@ -1,6 +1,6 @@
 import math
 from pypaq.lipytools.files import prep_folder
-from pypaq.mpython.devices import DevicesPypaq
+from torchness.devices import DevicesTorchness
 import random
 import time
 import unittest
@@ -14,7 +14,7 @@ HPMSER_FD = f'{flush_tmp_dir()}/hpmser'
 
 def some_func(
         name: str,
-        device: DevicesPypaq,
+        device: DevicesTorchness,
         a: int,
         b: float,
         c: float,
