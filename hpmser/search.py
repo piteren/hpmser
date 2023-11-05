@@ -28,8 +28,9 @@ class HPMSERException(Exception):
     pass
 
 
-# Hyper Parameters Search, runs after init
+
 class HPMSer:
+    """ Hyper Parameters Search """
 
     def __init__(
             self,
@@ -152,7 +153,7 @@ class HPMSer:
             report_N_top=   report_N_top,
             plot_axes=      plot_axes)
 
-    # runs search loop
+
     def _run(
             self,
             n_loops,
@@ -161,7 +162,9 @@ class HPMSer:
             explore,
             exploit,
             report_N_top,
-            plot_axes) -> List[Tuple[VPoint, Optional[float]]]:
+            plot_axes,
+    ) -> List[Tuple[VPoint, Optional[float]]]:
+        """ runs search loop """
 
         points_to_evaluate: List[POINT] = []  # POINTs to be evaluated
         points_at_workers: Dict[int, POINT] = {}  # POINTs that are being processed already {sample_num: POINT}
@@ -405,13 +408,14 @@ class HPMSer:
 
         return vpoints_estimated
 
-    # prepares estimation for Valued Points
+
     def _estimate(self, vpoints:List[VPoint]) -> Optional[np.ndarray]:
+        """ prepares estimation for Valued Points """
         if self.estimator.fitted:
             return self.estimator.predict_vpoints(vpoints=vpoints, space=self.paspa)
         return None
 
-    # appends POINTs fr >> to until given size reached, POINT cannot be closer than min_dist to any from to+other
+
     def _fill_up(
             self,
             fr: List[POINT],
@@ -420,6 +424,8 @@ class HPMSer:
             num: int,
             min_dist: float,
     ) -> Tuple[int, List[int]]:
+        """ appends POINTs fr >> to until given size reached
+        POINT cannot be closer than min_dist to any from to+other """
         n_added = 0
         added_ix = []
         for ix,pc in enumerate(fr):
@@ -439,8 +445,9 @@ class HPMSer:
 
         return n_added, added_ix
 
-    # prepares nice str about VPoint
+
     def _vpoint_nfo(self, vpoint:VPoint, estimation:Optional[float]=None) -> str:
+        """ prepares nice str about VPoint """
 
         prec = f'.{self.pcloud.prec}f'  # precision of print
 
@@ -453,8 +460,9 @@ class HPMSer:
             diff_nfo = f' {"+" if diff > 0 else "-"}{abs(diff):{prec}}'
         return f'{id_nfo}{est_nfo} [val: {vpoint.value:{prec}}{diff_nfo}] {point_str(vpoint.point)}'
 
-    # saves session
+
     def _save(self):
+        """ saves session """
         data = {
             'func':             self.func,
             'func_psdd':        self.func_psdd,
@@ -465,8 +473,9 @@ class HPMSer:
         w_pickle(data, f'{self.run_folder}/hpmser.save')
         w_pickle(data, f'{self.run_folder}/hpmser.save.back')
 
-    # loads session data
+
     def _load(self) -> Tuple[PointsCloud, SpaceEstimator]:
+        """ loads session data """
 
         try:
             data = r_pickle(f'{self.run_folder}/hpmser.save')
