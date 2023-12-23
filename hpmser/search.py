@@ -37,7 +37,7 @@ class HPMSer:
             func: Callable,                                     # function which parameters need to be optimized
             func_psdd: PSDD,                                    # function parameters space definition dict (PSDD), from here points {param: arg} will be sampled
             func_const: Optional[POINT]=            None,       # func constant kwargs, will be updated with sample (point) taken from PaSpa
-            devices: DevicesTorchness=              None,       # devices to use for search, check pypaq.mpython.devices
+            devices: DevicesTorchness=              None,       # devices to use for search, check torchness.devices
             n_loops: int=                           500,        # number of search loops, should be multiplier of update_estimator_loops
             update_size=                            20,         # frequency of estimator & pcloud update
             explore: float=                         0.2,        # factor of loops (from the beginning) with 100% random exploration of space
