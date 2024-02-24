@@ -119,7 +119,7 @@ class RBFRegressor(SpaceEstimator):
             **kwargs,
     ):
 
-        SpaceEstimator.__init__(self, **kwargs)
+        super().__init__(**kwargs)
 
         self._indexes =  {'c':0, 'g':0}
         self._epsilon = epsilon
