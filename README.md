@@ -1,5 +1,5 @@
 '<!--SKIP_FIX-->'
-![](HPMSer.png)
+![](hpmser.png)
 
 ## HPMSer - Hyper Parameters Search Tool
 
