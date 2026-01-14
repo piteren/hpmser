@@ -11,6 +11,7 @@ from pypaq.lipytools.stats import mam
 from pypaq.pms.paspa import PaSpa
 from pypaq.pms.base import PSDD, POINT, point_str
 from pypaq.pms.points_cloud import PointsCloud, VPoint
+from pypaq.pms.space_estimator import SpaceEstimator, RBFRegressor
 import random
 import select
 import sys
@@ -20,17 +21,14 @@ from torchness.devices import DevicesTorchness, get_devices
 from typing import Callable, Optional, List, Dict, Tuple
 
 from hpmser.running_worker import HRW
-from hpmser.space_estimator import SpaceEstimator, RBFRegressor
-
 
 
 class HPMSERException(Exception):
     pass
 
 
-
 class HPMSer:
-    """ Hyper Parameters Search """
+    """Hyper Parameters Search"""
 
     def __init__(
             self,
@@ -118,14 +116,13 @@ class HPMSer:
         self.logger.info(f'> hpmser resolved given devices ({len(devices)}): {devices}')
 
         self.ompr = OMPRunner(
-            rw_class=               HRW,
-            rw_init_kwargs=         {'func':func, 'func_const':func_const},
-            rw_lifetime=            1,
+            rww_class=              HRW,
+            rww_init_kwargs=        {'func':func, 'func_const':func_const},
+            rww_lifetime=           1,
             devices=                devices,
-            name=                   'OMPRunner_hpmser',
             ordered_results=        False,
-            log_RWW_exception=      self.logger.level < 20 or raise_exceptions,
-            raise_RWW_exception=    self.logger.level < 11 or raise_exceptions,
+            log_rww_exception=      self.logger.level < 20 or raise_exceptions,
+            raise_rww_exception=    self.logger.level < 11 or raise_exceptions,
             logger=                 get_child(logger=self.logger, name='ompr', change_level=10))
 
         self.tbwr = TBwr(logdir=self.run_folder) if do_TB else None
@@ -380,7 +377,7 @@ class HPMSer:
                     self.logger.info(f'{self._vpoint_nfo(vpoint=vpoint, estimation=estimation)} {time_taken:.1f}s')
 
         except KeyboardInterrupt:
-            self.logger.warning(' > hpmser_GX KeyboardInterrupt-ed..')
+            self.logger.warning(' > hpmser KeyboardInterrupt-ed..')
 
         self._save()
         self.ompr.exit()

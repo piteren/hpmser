@@ -4,9 +4,8 @@ from pypaq.pms.base import POINT, get_params
 from typing import Callable, Optional, Any
 
 
-
-# hpmser RunningWorker (process run by OMP in hpmser)
 class HRW(RunningWorker):
+    """hpmser RunningWorker (process run by OMP in hpmser)"""
 
     def __init__(
             self,
@@ -27,11 +26,12 @@ class HRW(RunningWorker):
                 self.func_const[k] = self.device
         if 'hpmser_mode' in func_args: self.func_const['hpmser_mode'] = True
 
-    # processes given point - computes value
     def process(
             self,
             point: POINT,
-            **kwargs) -> Any:
+            **kwargs
+    ) -> Any:
+        """processes given point - computes value"""
 
         point_with_defaults = {}
         point_with_defaults.update(self.func_const)
