@@ -34,6 +34,7 @@ class SpaceEstimator(ABC):
         return np.asarray(points_feats), np.asarray(scores)
 
     # updates model with given data, returns dict with update info
+    @abstractmethod
     def update(self, X_new:NPL, y_new:NPL) -> Dict[str,NUM]:
         pass
 
@@ -43,9 +44,9 @@ class SpaceEstimator(ABC):
         return self.update(X, y)
 
     # predicts
+    @abstractmethod
     def predict(self, X:NPL) -> np.ndarray:
         pass
-
 
     def predict_vpoints(self, vpoints:List[VPoint], space:PaSpa) -> np.ndarray:
         X, y = SpaceEstimator._extract_Xy(vpoints, space)
@@ -95,7 +96,6 @@ class SpaceEstimator(ABC):
     @abstractmethod
     def from_state(cls, state:Dict, logger):
         pass
-
 
     def __str__(self):
         return 'SpaceEstimator'
@@ -167,7 +167,6 @@ class RBFRegressor(SpaceEstimator):
         factor = max(0.1, factor)
         return np.where(y > y_cut, 1, factor)
 
-
     def update(self, X_new:NPL, y_new:NPL) -> Dict[str,NUM]:
         """ concatenates data, tries to update model params, fits & returns some info """
 
@@ -206,7 +205,7 @@ class RBFRegressor(SpaceEstimator):
         models = {config: self._build_model(**m_configs[config]) for config in m_configs}
 
         acc_loss = {k: 0 for k in m_configs}
-        for t_ix in range(self._num_tests):
+        for _ in range(self._num_tests):
 
             ### prepare data split
 
@@ -270,7 +269,6 @@ class RBFRegressor(SpaceEstimator):
             'loss_all_data_weighted':   loss_all_data_weighted,
             'c_ix':                     self._indexes['c'],
             'g_ix':                     self._indexes['g']}
-
 
     def predict(self, x:NPL) -> np.ndarray:
         if not self.fitted:

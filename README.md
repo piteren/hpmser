@@ -5,7 +5,7 @@
 
 ------------
 
-**HPMSer** is a tool for searching optimal hyper-parameters of any function. Assuming there is a function:
+**HPMSer** is a tool for searching optimal hyper-parameters of a function. Assuming there is a function:
 
 `def some_function(a, b, c, d) -> float`
 
@@ -13,7 +13,7 @@
 
 To start the search process, you will need to create an object of the `HPMSer` class by providing to its `__init__`:
 - a `func` (type)
-- parameters space definition passed to `func_psdd` (with PSDD - check `pypaq.pms.base.py` for details)
+- parameters space definition passed to `func_psdd`, check `pypaq.pms.base.py` for PSDD details
 - if some parameters are *known constants*, you may pass their values to `func_const`
 - configure `devices`, `n_loops` and optionally other advanced HPMSer parameters
 
@@ -30,7 +30,7 @@ that uses **HPMSer**.
 **HPMSer** features:
 - multiprocessing (runs with subprocesses) with CPU & GPU devices using the 'devices' parameter - check `pypaq.mpython.devices` for details
 - exception handling, keyboard interruption without a crash
-- automatic process adjustment
+- automatic process parameters adjustment
 - process saving & resuming
 - 3D visualisation of parameters and function values
 - TensorBoard logging of process parameters
