@@ -7,6 +7,7 @@ from pypaq.lipytools.moving_average import MovAvg
 from pypaq.lipytools.pylogger import get_pylogger, get_child
 from pypaq.lipytools.plots import three_dim
 from pypaq.lipytools.stats import mam
+from pypaq.lipytools.double_hinge import double_hinge
 from pypaq.pms.paspa import PaSpa
 from pypaq.pms.base import PSDD, POINT, point_str
 from pypaq.pms.points_cloud import PointsCloud, VPoint
@@ -24,37 +25,6 @@ from hpmser.running_worker import HRW
 
 class HPMSERException(Exception):
     pass
-
-# TODO: replace with pypaq.lipytools.double_hinge
-# double hinge function _/**
-def double_hinge(
-        s_val: float,
-        e_val: float,
-        sf: float,
-        ef: float,
-        counter: int,
-        max_count: int,
-) -> float:
-    """
-    returns:
-        - s_val in range <0;A> steps
-        - linear interpolation from s_val to e_val in range <A;B>
-        - e_val in range <B;max_count>
-
-    counter (step) belongs to <0;max_count>
-    A = max_count * sf
-    B = max_count * (1-ef)
-    0 <= A <= B <= max_count
-    """
-    if sf + ef > 1:
-        raise HPMSERException(f'sf + ef cannot be higher than 1')
-
-    x = counter / max_count         # where we are in time (x)
-    y = (x-sf)/(1-sf-ef)            # how high we are
-    if y<0: y=0
-    if y>1: y=1
-    val = s_val + (e_val-s_val)*y   # final value
-    return val
 
 
 class HPMSer:
@@ -313,32 +283,28 @@ class HPMSer:
 
                     points_known = [sp.point for sp in vpoints_evaluated] + list(points_at_workers.values()) # POINTs we already sampled
 
-                    estimated_factor = double_hinge(
-                        sf=explore, ef=exploit, counter=sample_num, max_count=n_loops,
-                        s_val=  0.0,
-                        e_val=  1.0)
+                    _point = sample_num / n_loops
+                    a_point = n_loops * explore
+                    b_point = n_loops * (1-exploit)
+
+                    estimated_factor = double_hinge(a_point=a_point, b_point=b_point, point=_point,
+                        a_value=0.0, b_value=1.0)
                     num_estimated_points = round(estimated_factor * (n_needed - len(points_to_evaluate))) if self.estimator.fitted else 0
 
-                    avg_nearest_start_factor = double_hinge(
-                        sf=explore, ef=exploit, counter=sample_num, max_count=n_loops,
-                        s_val=  1.0,
-                        e_val=  0.1)
+                    avg_nearest_start_factor = double_hinge(a_point=a_point, b_point=b_point, point=_point,
+                        a_value=1.0, b_value=0.1)
                     min_dist = self.pcloud.avg_nearest * avg_nearest_start_factor
                     while num_estimated_points:
 
-                        nc_multiplier = double_hinge(
-                            sf=explore, ef=exploit, counter=sample_num, max_count=n_loops,
-                            s_val=  10,
-                            e_val=  50)
+                        nc_multiplier = double_hinge(a_point=a_point, b_point=b_point, point=_point,
+                            a_value=10, b_value=50)
 
                         points_candidates = [self.paspa.sample_point() for _ in range(int(n_needed * nc_multiplier))]
                         vpcL = [VPoint(point=p) for p in points_candidates]
                         est_vpoints_candidates = self._estimate(vpoints=vpcL)
 
-                        upper_factor = double_hinge(
-                            sf=explore, ef=exploit, counter=sample_num, max_count=n_loops,
-                            s_val=  0.5,
-                            e_val=  0.1)
+                        upper_factor = double_hinge(a_point=a_point, b_point=b_point, point=_point,
+                            a_value=0.5, b_value=0.1)
 
                         ce = sorted(zip(points_candidates, est_vpoints_candidates), key=lambda x: x[1], reverse=True)
                         ce = ce[:int(len(points_candidates)*upper_factor)] # upper part of upper_factor size
