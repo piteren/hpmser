@@ -5,7 +5,7 @@ from pypaq.lipytools.files import get_requirements
 
 setup(
     name=               'hpmser',
-    version=            'v2.2.1',
+    version=            'v2.2.2',
     url=                'https://github.com/piteren/hpmser.git',
     author=             'Piotr Niewinski',
     author_email=       'pioniewinski@gmail.com',
