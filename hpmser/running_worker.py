@@ -13,12 +13,12 @@ class HRW(RunningWorker):
             func_const: Optional[POINT],
             device: DevicesTorchness=   None,
     ):
-
+        super().__init__()
         self.func = func
         self.func_const = func_const if func_const else {}
         self.device = device
 
-        # manage 'device'/'devices' & 'hpmser_mode' param in func >> set it in func if needed
+        # manage: device, devices, hpmser_mode param in func
         func_args = get_params(self.func)
         func_args = list(func_args['with_defaults'].keys()) + func_args['without_defaults']
         for k in ['device','devices']:
